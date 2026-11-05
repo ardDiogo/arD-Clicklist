@@ -21,7 +21,7 @@ const CORS = {
 }
 
 const MAX_BYTES = 3 * 1024 * 1024
-const TIMEOUT_MS = 15_000
+const TIMEOUT_MS = 25_000
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
