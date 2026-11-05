@@ -1,5 +1,6 @@
 // Edge Function: receipt-ai
-// Lê a FOTO de um comprovante com o Gemini e devolve os dados estruturados.
+// Lê a FOTO de um comprovante (ou o TEXTO da página da SEFAZ, quando o leitor automático
+// não reconhece o layout do estado) com o Gemini e devolve os dados estruturados.
 // NÃO grava nada no estoque: o app cria um rascunho e o usuário revisa e confirma.
 //
 // Secrets necessários (Edge Functions → Secrets):
@@ -147,13 +148,18 @@ Deno.serve(async (req) => {
     ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter((m): m is string => !!m)),
   ]
 
-  let fileId: string
+  // Dois modos: { file_id } = foto do cupom no Storage; { text } = texto da página da
+  // SEFAZ (QR Code da NFC-e) quando o leitor automático não reconhece o layout do estado.
+  let fileId = ''
+  let pageText = ''
   try {
-    fileId = String((await req.json())?.file_id ?? '')
+    const body = await req.json()
+    fileId = String(body?.file_id ?? '')
+    pageText = typeof body?.text === 'string' ? body.text.slice(0, 60_000) : ''
   } catch {
     return json({ error: 'Requisição inválida' }, 400)
   }
-  if (!/^[0-9a-f-]{36}$/i.test(fileId)) return json({ error: 'Arquivo inválido' }, 400)
+  if (!pageText && !/^[0-9a-f-]{36}$/i.test(fileId)) return json({ error: 'Arquivo inválido' }, 400)
 
   // Cliente com o token do usuário: RLS decide o que ele pode ler.
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, (Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY'))!, {
@@ -163,20 +169,35 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await supabase.auth.getUser(auth.replace(/^Bearer\s+/i, ''))
   if (userErr || !userData?.user) return json({ error: 'Sessão inválida. Entre novamente no app.' }, 401)
 
-  const { data: file, error: fileErr } = await supabase
-    .from('purchase_files')
-    .select('storage_path, mime_type, size_bytes')
-    .eq('id', fileId)
-    .maybeSingle()
-  if (fileErr || !file) return json({ error: 'Arquivo não encontrado' }, 404)
-  if (!file.mime_type.startsWith('image/')) return json({ error: 'A leitura por IA aceita apenas imagens' }, 400)
+  let parts: Record<string, unknown>[]
+  if (pageText) {
+    if (pageText.trim().length < 80) return json({ error: 'A página da SEFAZ veio vazia.' }, 422)
+    parts = [
+      {
+        text:
+          PROMPT +
+          '\n\nA entrada abaixo NÃO é uma imagem: é o TEXTO da página pública de consulta da NFC-e no portal da SEFAZ. ' +
+          'Extraia os mesmos campos a partir desse texto. Se não houver itens de produto, use unreadable = true.\n\n---\n' +
+          pageText,
+      },
+    ]
+  } else {
+    const { data: file, error: fileErr } = await supabase
+      .from('purchase_files')
+      .select('storage_path, mime_type, size_bytes')
+      .eq('id', fileId)
+      .maybeSingle()
+    if (fileErr || !file) return json({ error: 'Arquivo não encontrado' }, 404)
+    if (!file.mime_type.startsWith('image/')) return json({ error: 'A leitura por IA aceita apenas imagens' }, 400)
 
-  const { data: blob, error: dlErr } = await supabase.storage.from('receipts').download(file.storage_path)
-  if (dlErr || !blob) return json({ error: 'Não foi possível ler a imagem' }, 404)
+    const { data: blob, error: dlErr } = await supabase.storage.from('receipts').download(file.storage_path)
+    if (dlErr || !blob) return json({ error: 'Não foi possível ler a imagem' }, 404)
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    parts = [{ inline_data: { mime_type: file.mime_type, data: toBase64(bytes) } }, { text: PROMPT }]
+  }
 
-  const bytes = new Uint8Array(await blob.arrayBuffer())
   const result = await callGemini(apiKey, models, {
-      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: file.mime_type, data: toBase64(bytes) } }, { text: PROMPT }] }],
+      contents: [{ role: 'user', parts }],
       generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
     })
   if ('error' in result) return json({ error: result.error }, result.status)

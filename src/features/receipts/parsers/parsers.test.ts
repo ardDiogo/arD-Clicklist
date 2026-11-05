@@ -122,3 +122,21 @@ describe('helpers', () => {
     expect(r.access_key).toBeNull()
   })
 })
+
+import { htmlToText } from './html-text'
+
+describe('htmlToText', () => {
+  it('mantém linhas e colunas e remove scripts', () => {
+    const html = `<html><head><title>x</title><script>var a=1</script></head><body>
+      <h1>SUPERMERCADO BH LTDA</h1><table><tr><td>ARROZ 5KG</td><td>1</td><td>UN</td><td>25,90</td></tr>
+      <tr><td>CAF&Eacute; 500G</td><td>2</td><td>UN</td><td>39,80</td></tr></table><style>.a{}</style></body></html>`
+    const text = htmlToText(html)
+    expect(text).toContain('SUPERMERCADO BH LTDA')
+    expect(text).toContain('ARROZ 5KG | 1 | UN | 25,90')
+    expect(text).not.toContain('var a')
+    expect(text).not.toContain('.a{}')
+  })
+  it('limita o tamanho', () => {
+    expect(htmlToText(`<body>${'x '.repeat(50_000)}</body>`, 100).length).toBeLessThanOrEqual(100)
+  })
+})

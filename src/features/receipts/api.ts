@@ -2,6 +2,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
 import type { Json, PurchaseSource, Views } from '@/integrations/supabase/database.types'
 import type { Purchase, PurchaseItem } from './domain'
+import { htmlToText } from './parsers/html-text'
 import { parseNfceHtml } from './parsers/nfce-html'
 import { parseNfeXml } from './parsers/nfe-xml'
 import { parseNfceQr, ufFromAccessKey } from './parsers/qrcode'
@@ -113,13 +114,19 @@ export async function importFromQr(householdId: string, qrText: string): Promise
   const qr = parseNfceQr(qrText)
   if (!qr) throw new Error('Este QR Code não parece ser de uma NFC-e (o link precisa ser de um portal gov.br).')
   const { html, finalUrl } = await invoke<{ html: string; finalUrl: string }>('nfce-proxy', { url: qr.url })
-  const data = parseNfceHtml(html, finalUrl)
+  let data = parseNfceHtml(html, finalUrl)
   if (!data) {
+    // Layout do estado não reconhecido (ex.: portal de MG): a IA lê o TEXTO da página.
     const uf = ufFromAccessKey(qr.accessKey)
-    throw new Error(
-      `Não consegui ler a página da SEFAZ${uf ? ` de ${uf}` : ''} — o layout pode ser diferente. ` +
-        'Use a opção "Foto do cupom" ou o arquivo XML.',
-    )
+    try {
+      const fromText = await invoke<ReceiptData>('receipt-ai', { text: htmlToText(html) })
+      data = finalizeReceipt({ ...fromText, source_url: finalUrl })
+    } catch (e) {
+      throw new Error(
+        `Não consegui ler a página da SEFAZ${uf ? ` de ${uf}` : ''} (${e instanceof Error ? e.message : 'erro desconhecido'}). ` +
+          'Use a opção "Foto do cupom" ou o arquivo XML.',
+      )
+    }
   }
   return createDraft(householdId, 'nfce_qrcode', { ...data, access_key: data.access_key ?? qr.accessKey })
 }
