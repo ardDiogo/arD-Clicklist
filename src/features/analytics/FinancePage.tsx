@@ -98,22 +98,49 @@ export function FinancePage() {
     )
   }
 
+  const pendingNotice =
+    data.pendingDrafts > 0 ? (
+      <Link to="/compras" className="mb-5 block">
+        <Alert tone="success">
+          {data.pendingDrafts === 1
+            ? 'Há 1 compra aguardando sua confirmação. Ela só entra nos números depois de confirmada.'
+            : `Há ${data.pendingDrafts} compras aguardando sua confirmação. Elas só entram nos números depois de confirmadas.`}{' '}
+          <span className="font-semibold underline underline-offset-2">Revisar agora</span>
+        </Alert>
+      </Link>
+    ) : null
+
   if (data.purchases.length === 0) {
     return (
       <>
         {header}
-        <Card>
-          <EmptyState
-            icon={BarChart3}
-            title="Ainda não há compras confirmadas"
-            description="Os indicadores aparecem depois que você importar e confirmar comprovantes. Nenhum número é estimado sem dados reais."
-            action={
-              <Link to="/compras">
-                <Button size="sm">Registrar uma compra</Button>
-              </Link>
-            }
-          />
-        </Card>
+        {data.pendingDrafts > 0 ? (
+          <Card>
+            <EmptyState
+              icon={BarChart3}
+              title={`${data.pendingDrafts} ${data.pendingDrafts === 1 ? 'compra aguardando' : 'compras aguardando'} confirmação`}
+              description="Os preços e gastos já foram lidos, mas só entram no Financeiro depois que você confirmar cada compra em Compras → Para revisar."
+              action={
+                <Link to="/compras">
+                  <Button size="sm">Revisar e confirmar</Button>
+                </Link>
+              }
+            />
+          </Card>
+        ) : (
+          <Card>
+            <EmptyState
+              icon={BarChart3}
+              title="Ainda não há compras confirmadas"
+              description="Os indicadores aparecem depois que você importar e confirmar comprovantes. Nenhum número é estimado sem dados reais."
+              action={
+                <Link to="/compras">
+                  <Button size="sm">Registrar uma compra</Button>
+                </Link>
+              }
+            />
+          </Card>
+        )}
       </>
     )
   }
@@ -128,6 +155,7 @@ export function FinancePage() {
   return (
     <>
       {header}
+      {pendingNotice}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 animate-fade-in">
         <Stat label={`Gasto em ${monthLabel(thisMonth, true).split(' ')[0]}`} value={formatCurrency(current)}>

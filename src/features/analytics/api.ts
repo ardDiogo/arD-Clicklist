@@ -15,13 +15,15 @@ export interface FinanceData {
   priceChanges: PriceChangeRow[]
   purchases: Pick<PurchaseTotalRow, 'id' | 'purchased_at' | 'total'>[]
   openList: { estimatedTotal: number; withoutPrice: number; itemCount: number } | null
+  /** Compras importadas que ainda aguardam confirmação (não entram nos números). */
+  pendingDrafts: number
 }
 
 /** Carrega todos os indicadores reais dos últimos `months` meses. */
 export async function loadFinance(householdId: string, months: number): Promise<FinanceData> {
   const client = supabase()
   const since = addMonths(currentMonthKey(), -(months - 1))
-  const [monthly, categories, stores, priceChanges, purchases, list] = await Promise.all([
+  const [monthly, categories, stores, priceChanges, purchases, list, drafts] = await Promise.all([
     client.from('monthly_spending').select('*').eq('household_id', householdId).gte('month', since).order('month'),
     client.from('category_spending').select('*').eq('household_id', householdId).gte('month', since),
     client.from('store_spending').select('*').eq('household_id', householdId).order('total', { ascending: false }).limit(8),
@@ -33,6 +35,7 @@ export async function loadFinance(householdId: string, months: number): Promise<
       .order('purchased_at', { ascending: false })
       .limit(20),
     getOpenList(householdId),
+    client.from('purchases').select('id', { count: 'exact', head: true }).eq('household_id', householdId).eq('status', 'draft'),
   ])
 
   let openList: FinanceData['openList'] = null
@@ -49,5 +52,6 @@ export async function loadFinance(householdId: string, months: number): Promise<
     priceChanges: unwrap(priceChanges),
     purchases: unwrap(purchases),
     openList,
+    pendingDrafts: drafts.count ?? 0,
   }
 }

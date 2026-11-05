@@ -31,7 +31,7 @@ export function PriceCard({ householdProductId }: { householdProductId: string }
   if (!stats) {
     return (
       <Card>
-        <CardHeader title="Preços" description="Aparecem aqui depois da primeira compra confirmada com comprovante." />
+        <CardHeader title="Preços" description="Aparecem aqui depois que uma compra com este produto for confirmada em Compras." />
       </Card>
     )
   }
