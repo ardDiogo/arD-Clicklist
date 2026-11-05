@@ -106,8 +106,11 @@ export function groupStock(items: StockItem[], by: 'location' | 'category'): Sto
     }))
 }
 
-/** Situações exclusivas: ideal (tem o que precisa), repor (abaixo do ideal), sem estoque (zerado). */
-export type StockFilter = 'all' | 'ideal' | 'restock' | 'out'
+/**
+ * Situações exclusivas: ideal (tem o que precisa), repor (abaixo do ideal), sem estoque (zerado)
+ * e fora da lista (quantidade ideal 0 ou marcado "Não envia à lista").
+ */
+export type StockFilter = 'all' | 'ideal' | 'restock' | 'out' | 'off'
 
 /** Busca sem acento/maiúsculas em nome, marca, apresentação e código de barras. */
 export function filterStock(items: StockItem[], query: string, filter: StockFilter): StockItem[] {
@@ -116,6 +119,7 @@ export function filterStock(items: StockItem[], query: string, filter: StockFilt
     if (filter === 'ideal' && item.status !== 'ok') return false
     if (filter === 'restock' && item.status !== 'low') return false
     if (filter === 'out' && item.status !== 'out') return false
+    if (filter === 'off' && item.status !== 'untracked') return false
     if (!q) return true
     const haystack = normalize(
       [item.product_name, item.brand_name, item.presentation, item.barcode, item.category_name, item.location_name]

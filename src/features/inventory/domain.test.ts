@@ -122,7 +122,9 @@ describe('filterStock', () => {
     expect(filterStock(items, '', 'ideal').map((i) => i.product_name)).toEqual(['Arroz'])
     expect(filterStock(items, '', 'restock').map((i) => i.product_name)).toEqual(['Ketchup'])
     expect(filterStock(items, '', 'out').map((i) => i.product_name)).toEqual(['Café Melitta'])
-    expect(filterStock([...items, item({ product_name: 'Marmitex', status: 'untracked' })], '', 'all')).toHaveLength(4)
+    const all = [...items, item({ product_name: 'Marmitex', status: 'untracked' })]
+    expect(filterStock(all, '', 'all')).toHaveLength(4)
+    expect(filterStock(all, '', 'off').map((i) => i.product_name)).toEqual(['Marmitex'])
   })
 })
 

@@ -1,3 +1,4 @@
+import { clsx } from 'clsx'
 import { Boxes, Camera, ChevronRight, Combine, PackageSearch, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -9,7 +10,7 @@ import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
 import { toMessage } from '@/lib/errors'
 import { ListSkeleton, QtyFraction, Segmented, StatusDot, Stepper } from './components'
-import { filterStock, groupStock, productSubtitle, type StockFilter, type StockItem } from './domain'
+import { filterStock, formatQty, groupStock, productSubtitle, type StockFilter, type StockItem } from './domain'
 import { suggestMerges } from './api'
 import { useStock } from './hooks'
 import { useQuickMovement } from './useQuickMovement'
@@ -57,6 +58,7 @@ export function StockPage() {
       ideal: items.filter((i) => i.status === 'ok').length,
       restock: items.filter((i) => i.status === 'low').length,
       out: items.filter((i) => i.status === 'out').length,
+      off: items.filter((i) => i.status === 'untracked').length,
       toBuy: items.filter((i) => i.to_buy_qty > 0).length,
     }),
     [items],
@@ -149,19 +151,31 @@ export function StockPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* No celular a faixa rola de lado se não couber. */}
-              <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
-                <Segmented
-                  label="Filtro"
-                  value={filter}
-                  onChange={setFilter}
-                  options={[
+              <div role="radiogroup" aria-label="Filtro" className="flex flex-wrap gap-1.5">
+                {(
+                  [
                     { value: 'all', label: 'Todos', count: counts.all },
                     { value: 'ideal', label: 'Ideal', count: counts.ideal },
                     { value: 'restock', label: 'Repor', count: counts.restock },
                     { value: 'out', label: 'Sem estoque', count: counts.out },
-                  ]}
-                />
+                    { value: 'off', label: 'Fora da lista', count: counts.off },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={filter === o.value}
+                    onClick={() => setFilter(o.value)}
+                    className={clsx(
+                      'flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap transition-colors',
+                      filter === o.value ? 'bg-fg text-bg' : 'bg-surface-muted text-fg-muted hover:text-fg',
+                    )}
+                  >
+                    {o.label}
+                    <span className={clsx('tabular-nums', filter === o.value ? 'opacity-70' : 'text-fg-subtle')}>{o.count}</span>
+                  </button>
+                ))}
               </div>
               <Segmented
                 label="Agrupar por"
@@ -188,14 +202,18 @@ export function StockPage() {
                         ? 'Nada abaixo do ideal'
                         : filter === 'ideal'
                           ? 'Nenhum produto no ideal'
-                          : 'Tudo em dia'
+                          : filter === 'off'
+                            ? 'Todos os produtos vão para a lista'
+                            : 'Tudo em dia'
                 }
                 description={
                   query
                     ? `Nenhum produto corresponde a “${query}”.`
                     : filter === 'ideal'
                       ? 'Nenhum produto está com a quantidade ideal em casa.'
-                      : 'Nenhum produto neste filtro.'
+                      : filter === 'off'
+                        ? 'Aqui aparecem os produtos com quantidade ideal 0 ou marcados “Não envia à lista”.'
+                        : 'Nenhum produto neste filtro.'
                 }
               />
             </Card>
@@ -254,7 +272,14 @@ function StockRow({
           <p className="truncate text-[15px] leading-5 font-medium">{item.product_name}</p>
           {subtitle && <p className="truncate text-[13px] leading-5 text-fg-muted">{subtitle}</p>}
         </div>
-        <QtyFraction current={item.current_qty} ideal={item.ideal_qty} />
+        {item.status === 'untracked' ? (
+          <span className="flex flex-col items-end text-right">
+            <span className="text-[15px] font-semibold tabular-nums">{formatQty(item.current_qty)}</span>
+            <span className="text-[11px] whitespace-nowrap text-fg-subtle">{item.exclude_from_list ? 'não envia à lista' : 'ideal 0'}</span>
+          </span>
+        ) : (
+          <QtyFraction current={item.current_qty} ideal={item.ideal_qty} />
+        )}
         {canEdit ? (
           <Stepper
             label={item.product_name}
