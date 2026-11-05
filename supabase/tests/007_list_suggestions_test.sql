@@ -81,6 +81,16 @@ select tests.eq((select count(*) from public.shopping_list_items_view where hous
 select tests.eq((select added from public.suggest_shopping_from_history(:'hh', 1, '2026-10-01')), 0,
                 'em outubro (base: setembro) o que falta já está na lista ou removido');
 
+-- Motivos quando nada é adicionado
+select added as a, already_in_list as l, covered_by_stock as c, removed_by_user as r
+  from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15') \gset
+select tests.eq(:'a'::int || '|' || :'l'::int || '|' || :'c'::int || '|' || :'r'::int, '0|2|0|1',
+                'motivos: ketchup e sabonete já na lista, arroz removido pelo usuário');
+-- Estoque cobrindo o consumo
+select public.record_stock_movement(:'arroz', 'inventory_adjustment', 3) \gset
+select tests.eq((select covered_by_stock from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15')), 0,
+                'arroz removido não conta como coberto (motivo é a remoção)');
+
 -- Validações e permissões
 select tests.expect_error(format($$ select * from public.suggest_shopping_from_history(%L, 0) $$, :'hh'), 'Período inválido');
 select tests.login('00000000-0000-0000-0000-00000000000b');

@@ -64,7 +64,12 @@ export function ShoppingListPage() {
       if (!r || r.months_with_data === 0) {
         toast.show('Ainda não há compras dos últimos 3 meses para calcular o consumo')
       } else if (r.added === 0) {
-        toast.show('Nada novo: a lista já cobre o consumo médio dos últimos meses')
+        const reasons = [
+          r.already_in_list ? `${r.already_in_list} já ${r.already_in_list === 1 ? 'está' : 'estão'} na lista` : null,
+          r.covered_by_stock ? `${r.covered_by_stock} com estoque suficiente em casa` : null,
+          r.removed_by_user ? `${r.removed_by_user} removido${r.removed_by_user === 1 ? '' : 's'} por você (adicione pela busca)` : null,
+        ].filter(Boolean)
+        toast.show(reasons.length ? `Nada novo para sugerir: ${reasons.join(' · ')}` : 'Nada novo: a lista já cobre o consumo médio dos últimos meses')
       } else {
         toast.show(`+${r.added} ${r.added === 1 ? 'item sugerido' : 'itens sugeridos'} pelo consumo dos últimos ${r.months_with_data} meses`)
       }
