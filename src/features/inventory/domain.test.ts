@@ -118,9 +118,11 @@ describe('filterStock', () => {
     expect(filterStock(items, 'cafe', 'all')).toHaveLength(1)
     expect(filterStock(items, 'bonare', 'all')[0]?.product_name).toBe('Ketchup')
   })
-  it('filtra por reposição e sem estoque', () => {
-    expect(filterStock(items, '', 'restock')).toHaveLength(2)
-    expect(filterStock(items, '', 'out')).toHaveLength(1)
+  it('filtros exclusivos: ideal, repor (abaixo do ideal) e sem estoque', () => {
+    expect(filterStock(items, '', 'ideal').map((i) => i.product_name)).toEqual(['Arroz'])
+    expect(filterStock(items, '', 'restock').map((i) => i.product_name)).toEqual(['Ketchup'])
+    expect(filterStock(items, '', 'out').map((i) => i.product_name)).toEqual(['Café Melitta'])
+    expect(filterStock([...items, item({ product_name: 'Marmitex', status: 'untracked' })], '', 'all')).toHaveLength(4)
   })
 })
 

@@ -106,13 +106,15 @@ export function groupStock(items: StockItem[], by: 'location' | 'category'): Sto
     }))
 }
 
-export type StockFilter = 'all' | 'restock' | 'out'
+/** Situações exclusivas: ideal (tem o que precisa), repor (abaixo do ideal), sem estoque (zerado). */
+export type StockFilter = 'all' | 'ideal' | 'restock' | 'out'
 
 /** Busca sem acento/maiúsculas em nome, marca, apresentação e código de barras. */
 export function filterStock(items: StockItem[], query: string, filter: StockFilter): StockItem[] {
   const q = normalize(query)
   return items.filter((item) => {
-    if (filter === 'restock' && item.to_buy_qty <= 0) return false
+    if (filter === 'ideal' && item.status !== 'ok') return false
+    if (filter === 'restock' && item.status !== 'low') return false
     if (filter === 'out' && item.status !== 'out') return false
     if (!q) return true
     const haystack = normalize(

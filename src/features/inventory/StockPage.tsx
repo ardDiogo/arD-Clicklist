@@ -54,8 +54,10 @@ export function StockPage() {
   const counts = useMemo(
     () => ({
       all: items.length,
-      restock: items.filter((i) => i.to_buy_qty > 0).length,
+      ideal: items.filter((i) => i.status === 'ok').length,
+      restock: items.filter((i) => i.status === 'low').length,
       out: items.filter((i) => i.status === 'out').length,
+      toBuy: items.filter((i) => i.to_buy_qty > 0).length,
     }),
     [items],
   )
@@ -83,7 +85,7 @@ export function StockPage() {
       <PageHeader
         title="Estoque"
         description={
-          data ? `${counts.all} ${counts.all === 1 ? 'produto' : 'produtos'} · ${counts.restock} para repor` : undefined
+          data ? `${counts.all} ${counts.all === 1 ? 'produto' : 'produtos'} · ${counts.toBuy} para comprar` : undefined
         }
         action={addButton}
       />
@@ -147,16 +149,20 @@ export function StockPage() {
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Segmented
-                label="Filtro"
-                value={filter}
-                onChange={setFilter}
-                options={[
-                  { value: 'all', label: 'Todos', count: counts.all },
-                  { value: 'restock', label: 'Repor', count: counts.restock },
-                  { value: 'out', label: 'Sem estoque', count: counts.out },
-                ]}
-              />
+              {/* No celular a faixa rola de lado se não couber. */}
+              <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
+                <Segmented
+                  label="Filtro"
+                  value={filter}
+                  onChange={setFilter}
+                  options={[
+                    { value: 'all', label: 'Todos', count: counts.all },
+                    { value: 'ideal', label: 'Ideal', count: counts.ideal },
+                    { value: 'restock', label: 'Repor', count: counts.restock },
+                    { value: 'out', label: 'Sem estoque', count: counts.out },
+                  ]}
+                />
+              </div>
               <Segmented
                 label="Agrupar por"
                 value={groupBy}
@@ -173,8 +179,24 @@ export function StockPage() {
             <Card>
               <EmptyState
                 icon={PackageSearch}
-                title={query ? 'Nada encontrado' : filter === 'out' ? 'Nada em falta' : 'Tudo em dia'}
-                description={query ? `Nenhum produto corresponde a “${query}”.` : 'Nenhum produto neste filtro.'}
+                title={
+                  query
+                    ? 'Nada encontrado'
+                    : filter === 'out'
+                      ? 'Nada em falta'
+                      : filter === 'restock'
+                        ? 'Nada abaixo do ideal'
+                        : filter === 'ideal'
+                          ? 'Nenhum produto no ideal'
+                          : 'Tudo em dia'
+                }
+                description={
+                  query
+                    ? `Nenhum produto corresponde a “${query}”.`
+                    : filter === 'ideal'
+                      ? 'Nenhum produto está com a quantidade ideal em casa.'
+                      : 'Nenhum produto neste filtro.'
+                }
               />
             </Card>
           ) : (
