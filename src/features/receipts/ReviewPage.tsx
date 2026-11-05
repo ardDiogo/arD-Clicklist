@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Pencil, Trash2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
@@ -13,12 +13,17 @@ import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
 import { createTrackedProduct } from '@/features/inventory/api'
 import { formatQty, parseQty, productSubtitle, type StockItem } from '@/features/inventory/domain'
+import { parsePrice } from '@/features/shopping-list/domain'
 import { useLocations, useStock } from '@/features/inventory/hooks'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import {
   confirmPurchase,
-  discardPurchase,
+  addPurchaseItem,
+  deletePurchaseItem,
+  removePurchase,
+  reopenPurchase,
+  updatePurchaseItemValues,
   getPurchase,
   getPurchaseFiles,
   getPurchaseItems,
@@ -53,6 +58,8 @@ export function ReviewPage() {
   const [creatingFor, setCreatingFor] = useState<PurchaseItem | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [action, setAction] = useState<'reopen' | 'remove' | null>(null)
+  const [adding, setAdding] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -159,9 +166,50 @@ export function ReviewPage() {
               matched={item.household_product_id ? stockById.get(item.household_product_id) : undefined}
               onSave={(patch) => void save(item, patch)}
               onCreate={() => setCreatingFor(item)}
+              onEditValues={async (d, q, t) => {
+                try {
+                  await updatePurchaseItemValues(item.id, d, q, t)
+                  await load()
+                } catch (e) {
+                  toast.error(toMessage(e))
+                }
+              }}
+              onDelete={async () => {
+                if (!confirm(`Excluir "${item.description}" desta compra?`)) return
+                try {
+                  await deletePurchaseItem(item.id)
+                  await load()
+                } catch (e) {
+                  toast.error(toMessage(e))
+                }
+              }}
             />
           ))}
         </ul>
+        {editable &&
+          (adding ? (
+            <ItemValuesForm
+              submitLabel="Adicionar"
+              onCancel={() => setAdding(false)}
+              onSubmit={async (d, q, t) => {
+                try {
+                  await addPurchaseItem(purchase.id, d, q, t)
+                  setAdding(false)
+                  await load()
+                } catch (e) {
+                  toast.error(toMessage(e))
+                }
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="flex w-full items-center justify-center gap-1.5 border-t border-border py-3 text-[13px] font-medium text-fg-muted hover:bg-surface-muted/60 hover:text-fg"
+            >
+              <Plus className="size-4" /> Adicionar item
+            </button>
+          ))}
       </Card>
 
       {purchase.status === 'draft' && can.edit(role) && (
@@ -173,7 +221,7 @@ export function ReviewPage() {
             onClick={async () => {
               if (!confirm('Descartar esta leitura? Nada será lançado no estoque.')) return
               try {
-                await discardPurchase(purchase.id)
+                await removePurchase(purchase.id)
                 toast.show('Leitura descartada')
                 navigate('/compras', { replace: true })
               } catch (e) {
@@ -185,6 +233,45 @@ export function ReviewPage() {
           </Button>
         </div>
       )}
+
+      {purchase.status === 'confirmed' && can.edit(role) && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button size="sm" variant="secondary" icon={<RotateCcw className="size-3.5" />} onClick={() => setAction('reopen')}>
+            Editar compra
+          </Button>
+          <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" />} onClick={() => setAction('remove')}>
+            Remover compra
+          </Button>
+        </div>
+      )}
+
+      <Dialog
+        open={action !== null}
+        onClose={() => setAction(null)}
+        title={action === 'remove' ? 'Remover esta compra?' : 'Editar esta compra?'}
+      >
+        <PurchaseActionBody
+          action={action}
+          onCancel={() => setAction(null)}
+          onConfirm={async () => {
+            try {
+              if (action === 'remove') {
+                await removePurchase(purchase.id)
+                setAction(null)
+                toast.show('Compra removida e estoque estornado')
+                navigate('/compras', { replace: true })
+              } else {
+                await reopenPurchase(purchase.id)
+                setAction(null)
+                toast.show('Compra reaberta: corrija e confirme de novo')
+                await load()
+              }
+            } catch (e) {
+              toast.error(toMessage(e))
+            }
+          }}
+        />
+      </Dialog>
 
       {editable && (
         <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-10 border-t border-border bg-bg/90 backdrop-blur-xl lg:bottom-0 lg:left-60">
@@ -265,6 +352,8 @@ function ReviewRow({
   matched,
   onSave,
   onCreate,
+  onEditValues,
+  onDelete,
 }: {
   item: PurchaseItem
   editable: boolean
@@ -272,7 +361,10 @@ function ReviewRow({
   matched: StockItem | undefined
   onSave: (patch: Partial<PurchaseItem>) => void
   onCreate: () => void
+  onEditValues: (description: string, quantity: number, total: number) => Promise<void>
+  onDelete: () => void
 }) {
+  const [editingValues, setEditingValues] = useState(false)
   const suggestions = useMemo(
     () => (item.household_product_id ? [] : suggestProducts(item.description, stock)),
     [item.description, item.household_product_id, stock],
@@ -294,7 +386,29 @@ function ReviewRow({
           </p>
         </div>
         <p className="text-[14px] font-semibold tabular-nums">{formatCurrency(item.total_price)}</p>
+        {editable && !editingValues && (
+          <button
+            type="button"
+            aria-label={`Editar ${item.description}`}
+            onClick={() => setEditingValues(true)}
+            className="-mr-1 grid size-7 shrink-0 place-items-center rounded-md text-fg-subtle hover:bg-surface-muted hover:text-fg"
+          >
+            <Pencil className="size-3.5" />
+          </button>
+        )}
       </div>
+      {editingValues && (
+        <ItemValuesForm
+          initial={item}
+          submitLabel="Salvar"
+          onCancel={() => setEditingValues(false)}
+          onDelete={onDelete}
+          onSubmit={async (d, q, t) => {
+            await onEditValues(d, q, t)
+            setEditingValues(false)
+          }}
+        />
+      )}
 
       {item.hint && !item.ignored && (
         <p className="flex items-start gap-1.5 text-[12px] text-amber-700 dark:text-amber-400">
@@ -595,5 +709,128 @@ function RenameStoreDialog({
         </div>
       </form>
     </Dialog>
+  )
+}
+
+/** Formulário de descrição, quantidade e valor total de um item da compra. */
+function ItemValuesForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  onDelete,
+}: {
+  initial?: Pick<PurchaseItem, 'description' | 'quantity' | 'total_price'>
+  submitLabel: string
+  onSubmit: (description: string, quantity: number, total: number) => Promise<void>
+  onCancel: () => void
+  onDelete?: () => void
+}) {
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [qty, setQty] = useState(initial ? formatQty(initial.quantity) : '1')
+  const [total, setTotal] = useState(initial ? initial.total_price.toFixed(2).replace('.', ',') : '')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const field =
+    'h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-[14px] focus:border-accent-500 focus:ring-3 focus:ring-accent-500/15 focus:outline-none'
+  return (
+    <form
+      className="space-y-2 bg-surface-muted/40 px-4 py-3"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        const q = parseQty(qty)
+        const t = parsePrice(total)
+        if (!description.trim()) return setError('Informe a descrição.')
+        if (q === null || q <= 0) return setError('Quantidade inválida.')
+        if (t === undefined || t === null) return setError('Valor inválido. Use, por exemplo, 8,99.')
+        setBusy(true)
+        try {
+          await onSubmit(description, q, t)
+        } finally {
+          setBusy(false)
+        }
+      }}
+    >
+      <input className={field} aria-label="Descrição" placeholder="Descrição (ex.: ARROZ 5KG)" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} />
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-1">
+          <span className="text-[12px] text-fg-muted">Quantidade</span>
+          <input className={field} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />
+        </label>
+        <label className="space-y-1">
+          <span className="text-[12px] text-fg-muted">Valor total (R$)</span>
+          <input className={field} inputMode="decimal" placeholder="0,00" value={total} onChange={(e) => setTotal(e.target.value)} />
+        </label>
+      </div>
+      {error && <p className="text-[12px] text-danger">{error}</p>}
+      <div className="flex items-center justify-between gap-2">
+        {onDelete ? (
+          <Button size="sm" variant="danger" className="-ml-3" icon={<Trash2 className="size-3.5" />} onClick={onDelete}>
+            Excluir item
+          </Button>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button size="sm" type="submit" loading={busy}>
+            {submitLabel}
+          </Button>
+        </div>
+      </div>
+    </form>
+  )
+}
+
+function PurchaseActionBody({
+  action,
+  onCancel,
+  onConfirm,
+}: {
+  action: 'reopen' | 'remove' | null
+  onCancel: () => void
+  onConfirm: () => Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="space-y-4 text-[14px] leading-5">
+      {action === 'remove' ? (
+        <>
+          <p>As quantidades que esta compra colocou no estoque serão <strong>estornadas</strong>, e ela sai do histórico de preços e do Financeiro.</p>
+          <p className="text-[13px] text-fg-muted">
+            Se parte já foi consumida, só o que ainda existe em casa é estornado. O histórico de movimentações fica registrado.
+          </p>
+        </>
+      ) : (
+        <>
+          <p>
+            A compra volta para <strong>revisão</strong>: as quantidades lançadas no estoque são estornadas e você pode corrigir itens,
+            quantidades, valores e produtos.
+          </p>
+          <p className="text-[13px] text-fg-muted">Ao confirmar de novo, o estoque e os preços são lançados com os valores corrigidos.</p>
+        </>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          Cancelar
+        </Button>
+        <Button
+          variant={action === 'remove' ? 'danger' : 'primary'}
+          loading={busy}
+          onClick={async () => {
+            setBusy(true)
+            try {
+              await onConfirm()
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          {action === 'remove' ? 'Remover compra' : 'Editar compra'}
+        </Button>
+      </div>
+    </div>
   )
 }

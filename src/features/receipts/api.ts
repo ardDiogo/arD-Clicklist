@@ -223,6 +223,42 @@ export async function renamePurchaseStore(id: string, storeName: string, applyTo
   )
 }
 
+/** Reabre uma compra confirmada para edição (estorna o que ela lançou no estoque). */
+export async function reopenPurchase(id: string): Promise<number> {
+  return unwrap(await supabase().rpc('reopen_purchase', { p_purchase_id: id }))
+}
+
+/** Remove a compra (se confirmada, estorna o estoque antes). */
+export async function removePurchase(id: string): Promise<number> {
+  return unwrap(await supabase().rpc('remove_purchase', { p_purchase_id: id }))
+}
+
+export async function updatePurchaseItemValues(id: string, description: string, quantity: number, totalPrice: number): Promise<void> {
+  unwrap(
+    await supabase().rpc('update_purchase_item_values', {
+      p_item_id: id,
+      p_description: description.trim(),
+      p_quantity: quantity,
+      p_total_price: totalPrice,
+    }),
+  )
+}
+
+export async function deletePurchaseItem(id: string): Promise<void> {
+  unwrap(await supabase().rpc('delete_purchase_item', { p_item_id: id }))
+}
+
+export async function addPurchaseItem(purchaseId: string, description: string, quantity: number, totalPrice: number): Promise<string> {
+  return unwrap(
+    await supabase().rpc('add_purchase_item', {
+      p_purchase_id: purchaseId,
+      p_description: description.trim(),
+      p_quantity: quantity,
+      p_total_price: totalPrice,
+    }),
+  )
+}
+
 export async function confirmPurchase(id: string): Promise<number> {
   const rows = unwrap(await supabase().rpc('confirm_purchase', { p_purchase_id: id }))
   return rows[0]?.applied_items ?? 0

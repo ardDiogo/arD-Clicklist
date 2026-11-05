@@ -227,6 +227,7 @@ export type Database = {
           purchased_at: string | null
           access_key: string | null
           file_sha256: string | null
+          revision: number
           source_url: string | null
           total_amount: number | null
           discount_amount: number | null
@@ -619,6 +620,17 @@ export type Database = {
       rename_purchase_store: {
         Args: { p_purchase_id: string; p_store_name: string; p_apply_to_same_name?: boolean }
         Returns: number
+      }
+      reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      remove_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      update_purchase_item_values: {
+        Args: { p_item_id: string; p_description: string; p_quantity: number; p_total_price: number }
+        Returns: undefined
+      }
+      delete_purchase_item: { Args: { p_item_id: string }; Returns: undefined }
+      add_purchase_item: {
+        Args: { p_purchase_id: string; p_description: string; p_quantity: number; p_total_price: number }
+        Returns: string
       }
       confirm_purchase: { Args: { p_purchase_id: string }; Returns: { applied_items: number }[] }
       discard_purchase: { Args: { p_purchase_id: string }; Returns: undefined }
