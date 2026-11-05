@@ -56,6 +56,10 @@ const router = createBrowserRouter([
                   { index: true, element: <DashboardPage /> },
                   { path: '/estoque', element: <StockPage /> },
                   { path: '/estoque/novo', element: <ProductFormPage /> },
+                  {
+                    path: '/estoque/parecidos',
+                    lazy: async () => ({ Component: (await import('@/features/inventory/MergeSuggestionsPage')).MergeSuggestionsPage }),
+                  },
                   { path: '/estoque/:id', element: <StockItemPage /> },
                   { path: '/estoque/:id/editar', element: <ProductFormPage /> },
                   { path: '/inventario', element: <ScansPage /> },

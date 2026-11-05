@@ -1,5 +1,5 @@
-import { Boxes, Camera, ChevronRight, PackageSearch, Plus, Search, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Boxes, Camera, ChevronRight, Combine, PackageSearch, Plus, Search, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
@@ -10,6 +10,7 @@ import { can } from '@/features/household/roles'
 import { toMessage } from '@/lib/errors'
 import { ListSkeleton, QtyFraction, Segmented, StatusDot, Stepper } from './components'
 import { filterStock, groupStock, productSubtitle, type StockFilter, type StockItem } from './domain'
+import { suggestMerges } from './api'
 import { useStock } from './hooks'
 import { useQuickMovement } from './useQuickMovement'
 
@@ -32,6 +33,13 @@ export function StockPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StockFilter>('all')
   const [groupBy, setGroupByState] = useState(readGroupBy)
+  const [similar, setSimilar] = useState(0)
+
+  // Quantos produtos parecidos podem ser juntados (silencioso se a migration não rodou).
+  useEffect(() => {
+    if (!canEdit) return
+    suggestMerges(household.id).then((r) => setSimilar(r.length), () => setSimilar(0))
+  }, [household.id, canEdit, data?.length])
 
   const setGroupBy = (v: 'location' | 'category') => {
     setGroupByState(v)
@@ -102,6 +110,20 @@ export function StockPage() {
         </Card>
       ) : (
         <div className="space-y-5">
+          {similar > 0 && (
+            <Link to="/estoque/parecidos" className="block">
+              <Card className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-muted/50">
+                <Combine className="size-4 shrink-0 text-accent-600" />
+                <p className="min-w-0 flex-1 text-[14px]">
+                  <span className="font-medium">
+                    {similar} {similar === 1 ? 'produto parecido' : 'produtos parecidos'}
+                  </span>{' '}
+                  <span className="text-fg-muted">podem ser juntados (mesmo item, marca diferente)</span>
+                </p>
+                <ChevronRight className="size-4 text-fg-subtle" />
+              </Card>
+            </Link>
+          )}
           <div className="space-y-3">
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-fg-subtle" />

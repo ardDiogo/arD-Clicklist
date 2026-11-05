@@ -135,6 +135,26 @@ export async function setIdealQty(id: string, idealQty: number): Promise<void> {
   unwrap(await supabase().from('household_products').update({ ideal_qty: idealQty }).eq('id', id))
 }
 
+export interface MergeSuggestion {
+  from_id: string
+  from_name: string
+  from_qty: number
+  into_id: string
+  into_name: string
+  into_qty: number
+}
+
+/** Pares de produtos parecidos (o específico/duplicado → o genérico que fica). */
+export async function suggestMerges(householdId: string): Promise<MergeSuggestion[]> {
+  const rows = unwrap(await supabase().rpc('suggest_product_merges', { p_household_id: householdId }))
+  return rows.map((r) => ({ ...r, from_qty: Number(r.from_qty), into_qty: Number(r.into_qty) }))
+}
+
+/** Junta "from" em "into": estoque, compras, preços, apelidos e listas passam para "into". */
+export async function mergeProducts(from: string, into: string): Promise<void> {
+  unwrap(await supabase().rpc('merge_household_products', { p_from: from, p_into: into }))
+}
+
 /** "Não envia à lista": o produto não entra sozinho na lista de compras. Retorna quantos itens saíram da lista aberta. */
 export async function setListExclusion(id: string, exclude: boolean): Promise<number> {
   return unwrap(await supabase().rpc('set_product_list_exclusion', { p_household_product_id: id, p_exclude: exclude }))

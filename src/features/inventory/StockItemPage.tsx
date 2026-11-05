@@ -13,11 +13,12 @@ import { can } from '@/features/household/roles'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
-import { archiveItem, getStockItem, setListExclusion, listMovements, recordMovement, transferItem, type Movement } from './api'
+import { archiveItem, getStockItem, mergeProducts, setListExclusion, listMovements, recordMovement, transferItem, type Movement } from './api'
 import { StatusPill, Stepper } from './components'
 import { formatQty, MOVEMENT_LABEL, newIdempotencyKey, parseQty, productSubtitle, type StockItem } from './domain'
 import { PriceCard } from '@/features/receipts/PriceCard'
-import { useLocations } from './hooks'
+import { useLocations, useStock } from './hooks'
+import { Dialog } from '@/components/ui/Dialog'
 import { useQuickMovement } from './useQuickMovement'
 
 export function StockItemPage() {
@@ -131,6 +132,7 @@ export function StockItemPage() {
           <CountCard item={item} onDone={reload} />
           <TransferCard item={item} householdId={household.id} onDone={reload} />
           <ListExclusionCard item={item} onDone={reload} />
+          <MergeCard item={item} householdId={household.id} />
         </>
       )}
 
@@ -350,6 +352,111 @@ function ListExclusionCard({ item, onDone }: { item: StockItem; onDone: () => Pr
       >
         <span className={clsx('absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow transition-transform', on && 'translate-x-5')} />
       </button>
+    </Card>
+  )
+}
+
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .trim()
+
+/** Junta este produto (duplicado) em outro: estoque, compras, preços e lista passam para o escolhido. */
+function MergeCard({ item, householdId }: { item: StockItem; householdId: string }) {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { data: stock } = useStock(householdId)
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [target, setTarget] = useState<StockItem | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const first = norm(item.product_name).split(/\s+/)[0] ?? ''
+  const q = norm(query)
+  const options = (stock ?? [])
+    .filter((s) => s.id !== item.id)
+    .filter((s) => !q || norm(`${s.product_name} ${s.brand_name ?? ''}`).includes(q))
+    .sort((a, b) => {
+      // parecidos (mesma 1ª palavra) primeiro
+      const pa = norm(a.product_name).startsWith(first.slice(0, 3)) ? 0 : 1
+      const pb = norm(b.product_name).startsWith(first.slice(0, 3)) ? 0 : 1
+      return pa - pb || a.product_name.localeCompare(b.product_name, 'pt-BR')
+    })
+    .slice(0, 30)
+
+  async function merge() {
+    if (!target) return
+    setBusy(true)
+    try {
+      await mergeProducts(item.id, target.id)
+      toast.show(`Juntado em “${target.product_name}”`)
+      navigate(`/estoque/${target.id}`, { replace: true })
+    } catch (e) {
+      toast.error(toMessage(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="flex items-center justify-between gap-4 p-5">
+      <div className="min-w-0">
+        <p className="text-[14px] font-medium">Juntar com outro produto</p>
+        <p className="mt-0.5 text-[13px] text-fg-muted">
+          Cadastrado em dobro (ex.: marca diferente)? Junte num produto só: estoque, compras, preços e lista passam para ele.
+        </p>
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        Juntar
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Juntar “${item.product_name}” em…`}>
+        {!target ? (
+          <div className="space-y-3">
+            <TextField label="Buscar produto" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ex.: pão de forma" autoFocus />
+            <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+              {options.length === 0 ? (
+                <li className="px-4 py-3 text-[14px] text-fg-muted">Nenhum produto encontrado.</li>
+              ) : (
+                options.map((o) => (
+                  <li key={o.id}>
+                    <button type="button" onClick={() => setTarget(o)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface-muted/60">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-medium">{o.product_name}</span>
+                        <span className="block truncate text-[12px] text-fg-muted">{productSubtitle(o) || 'Sem marca'}</span>
+                      </span>
+                      <span className="text-[12px] text-fg-muted tabular-nums">{formatQty(o.current_qty)} em casa</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        ) : (
+          <div className="space-y-4 text-[14px] leading-5">
+            <p>
+              <span className="font-medium">{item.product_name}</span> vai fazer parte de <span className="font-medium">{target.product_name}</span>:
+            </p>
+            <ul className="list-disc space-y-1 pl-5 text-fg-muted">
+              <li>
+                estoque: {formatQty(target.current_qty)} + {formatQty(item.current_qty)} = {formatQty(target.current_qty + item.current_qty)}
+              </li>
+              <li>compras e histórico de preços passam para {target.product_name} (a marca de cada compra continua registrada)</li>
+              <li>as próximas notas com a mesma descrição entram direto em {target.product_name}</li>
+              <li>{item.product_name} sai do estoque</li>
+            </ul>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setTarget(null)} disabled={busy}>
+                Voltar
+              </Button>
+              <Button loading={busy} onClick={() => void merge()}>
+                Juntar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </Card>
   )
 }

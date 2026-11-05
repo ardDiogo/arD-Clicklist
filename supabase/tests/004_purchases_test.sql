@@ -45,7 +45,8 @@ select tests.eq((select household_product_id from public.purchase_items where pu
                 :'ketchup'::text, 'ketchup associado pelo código de barras');
 select tests.eq((select match_source from public.purchase_items where purchase_id = :'p1' and line_number = 1), 'barcode', 'origem: barcode');
 select tests.eq((select household_product_id from public.purchase_items where purchase_id = :'p1' and line_number = 2)::text,
-                null::text, 'café sem associação na primeira vez');
+                :'cafe'::text, 'café associado pelo nome (qualquer marca)');
+select tests.eq((select match_source from public.purchase_items where purchase_id = :'p1' and line_number = 2), 'name', 'origem: nome');
 select tests.eq((select stock_quantity from public.purchase_items where purchase_id = :'p1' and line_number = 3), 1.000::numeric,
                 'item por peso entra como 1 embalagem');
 select tests.eq((select stock_quantity from public.purchase_items where purchase_id = :'p1' and line_number = 1), 2.000::numeric,
@@ -70,7 +71,7 @@ select id as it_ketchup from public.purchase_items where purchase_id = :'p1' and
 select public.update_purchase_item(:'it_cafe', :'cafe', true, false, 1);
 select public.update_purchase_item(:'it_banana', :'banana', true, false, 6);  -- 6 bananas
 select public.update_purchase_item(:'it_sacola', null, false, true, 0);       -- não é produto de estoque
-select tests.eq((select match_source from public.purchase_items where id = :'it_cafe'), 'user', 'associação manual registrada');
+select tests.eq((select match_source from public.purchase_items where id = :'it_cafe'), 'name', 'mesmo produto: mantém a origem (nome)');
 select tests.expect_error(format($$ select public.update_purchase_item(%L, %L, true, false, 1) $$, :'it_cafe', :'prod_c'),
                           'outra família');
 select tests.expect_error(format($$ select public.update_purchase_item(%L, %L, true, false, -1) $$, :'it_cafe', :'cafe'),
