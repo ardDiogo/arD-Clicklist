@@ -337,7 +337,8 @@ function FinishDialog({
   const checked = items.filter((i) => i.checked_at)
   const stockItems = checked.filter((i) => i.household_product_id)
   const leftBehind = items.length - checked.length
-  const [apply, setApply] = useState(true)
+  // O estoque entra pelo cupom (Compras). Lançar pela lista é exceção, para compras sem cupom.
+  const [apply, setApply] = useState(false)
   const [busy, setBusy] = useState(false)
 
   return (
@@ -356,10 +357,11 @@ function FinishDialog({
               className="mt-0.5 size-4 accent-[var(--color-accent-600)]"
             />
             <span>
-              <span className="font-medium">Adicionar ao estoque</span>
+              <span className="font-medium">Lançar no estoque agora (compra sem cupom)</span>
               <span className="block text-[13px] text-fg-muted">
-                Confirmo que recebi os {stockItems.length} {stockItems.length === 1 ? 'produto marcado' : 'produtos marcados'}. As
-                quantidades entram como compra.
+                Deixe desmarcado se for registrar o cupom em Compras — é o cupom que dá entrada no estoque, com quantidades e
+                preços reais. Marque só se não houver cupom; aí os {stockItems.length}{' '}
+                {stockItems.length === 1 ? 'produto marcado entra' : 'produtos marcados entram'} pela quantidade da lista.
               </span>
             </span>
           </label>
