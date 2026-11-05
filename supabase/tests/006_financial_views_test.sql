@@ -38,12 +38,12 @@ select tests.eq((select total from public.monthly_spending where month = '2026-1
 select tests.eq((select avg_ticket from public.monthly_spending where month = '2026-11-01'), 18.80::numeric, 'ticket médio de novembro');
 select tests.eq((select purchases from public.monthly_spending where month = '2026-10-01'), 2, 'duas compras em outubro');
 
-select tests.eq((select total from public.category_spending where month = '2026-11-01' and category_name = 'Mercearia'), 21.60::numeric,
-                'mercearia em novembro');
+select tests.eq((select total from public.category_spending where month = '2026-11-01' and category_name = 'Mercearia'), 31.60::numeric,
+                'mercearia em novembro (café 21,60 + presente cadastrado automaticamente 10,00)');
 select tests.eq((select total from public.category_spending where month = '2026-11-01' and category_name = 'Limpeza'), 6.00::numeric,
                 'limpeza em novembro');
-select tests.eq((select total from public.category_spending where month = '2026-11-01' and category_name = 'Não associados'), 10.00::numeric,
-                'item sem produto aparece como não associado');
+select tests.eq((select count(*) from public.category_spending where category_name = 'Não associados')::int, 0,
+                'com o cadastro automático, não sobram itens sem produto');
 
 select tests.eq((select visits from public.store_spending where store_name = 'Mercado X'), 3, 'três visitas ao Mercado X');
 select tests.eq((select total from public.store_spending where store_name = 'Mercado X'), 70.10::numeric, 'total gasto no Mercado X');

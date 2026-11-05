@@ -73,23 +73,42 @@ export function titleCase(description: string): string {
 
 export interface ReviewSummary {
   toStock: number
-  unmatched: number
+  /** Itens sem produto associado: viram produtos novos na confirmação. */
+  newProducts: number
   ignored: number
   notReceived: number
 }
 
+/** Mesma chave de agrupamento do banco (normalize_text): linhas iguais viram 1 produto. */
+function descriptionKey(d: string): string {
+  return normalize(d).replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
 export function reviewSummary(items: PurchaseItem[]): ReviewSummary {
   let toStock = 0
-  let unmatched = 0
   let ignored = 0
   let notReceived = 0
+  const newKeys = new Set<string>()
   for (const i of items) {
-    if (i.ignored) ignored++
-    else if (!i.household_product_id) unmatched++
-    else if (!i.received || i.stock_quantity <= 0) notReceived++
+    if (i.ignored) {
+      ignored++
+      continue
+    }
+    if (!i.household_product_id) newKeys.add(descriptionKey(i.description))
+    if (!i.received || i.stock_quantity <= 0) notReceived++
     else toStock++
   }
-  return { toStock, unmatched, ignored, notReceived }
+  return { toStock, newProducts: newKeys.size, ignored, notReceived }
+}
+
+/** Nome que o banco dará ao produto criado automaticamente (espelha product_name_from_description). */
+export function autoProductName(description: string): string {
+  const cleaned = description
+    .replace(/^\s*(FLV|HORT)\s+/i, '')
+    .replace(/\s*\d+(?:[.,]\d+)?\s*(KG|ML|LT|L|GR|G)\b/gi, '')
+    .replace(/\s+(KG|GRANEL)\s*$/i, '')
+    .trim()
+  return titleCase(cleaned || description)
 }
 
 /** Variação percentual entre o último preço e o anterior. */

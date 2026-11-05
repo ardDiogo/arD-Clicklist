@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StockItem } from '@/features/inventory/domain'
-import { priceVariation, reviewSummary, similarity, suggestProducts, titleCase, type PurchaseItem } from './domain'
+import { autoProductName, priceVariation, reviewSummary, similarity, suggestProducts, titleCase, type PurchaseItem } from './domain'
 
 const stock = [
   { id: '1', product_name: 'Café', brand_name: 'Melitta', presentation: 'Tradicional', package_size: 500, unit: 'g' },
@@ -28,16 +28,25 @@ describe('titleCase', () => {
 })
 
 describe('reviewSummary', () => {
-  it('conta o que será lançado, o que falta associar e o que foi ignorado', () => {
-    const base = { household_product_id: 'x', received: true, ignored: false, stock_quantity: 1 }
+  it('conta lançamentos, produtos novos (agrupando linhas iguais), ignorados e não recebidos', () => {
+    const base = { household_product_id: 'x', received: true, ignored: false, stock_quantity: 1, description: 'A' }
     const items = [
       base,
-      { ...base, household_product_id: null },
+      { ...base, household_product_id: null, description: 'SARD COQUEIRO 125G TOM' },
+      { ...base, household_product_id: null, description: 'SARD COQUEIRO 125G TOM' },
       { ...base, ignored: true },
       { ...base, received: false },
       { ...base, stock_quantity: 0 },
     ] as PurchaseItem[]
-    expect(reviewSummary(items)).toEqual({ toStock: 1, unmatched: 1, ignored: 1, notReceived: 2 })
+    expect(reviewSummary(items)).toEqual({ toStock: 3, newProducts: 1, ignored: 1, notReceived: 2 })
+  })
+})
+
+describe('autoProductName', () => {
+  it('gera o mesmo nome que o banco usa no cadastro automático', () => {
+    expect(autoProductName('AZEITE ANDORINHA 500ML EXT VIRG VD')).toBe('Azeite Andorinha Ext Virg Vd')
+    expect(autoProductName('FLV BANANA PRATA KG')).toBe('Banana Prata')
+    expect(autoProductName('SUCO PANIZZON 100% 1,350L UVA')).toBe('Suco Panizzon 100% Uva')
   })
 })
 

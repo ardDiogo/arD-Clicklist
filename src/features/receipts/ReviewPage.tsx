@@ -25,7 +25,7 @@ import {
   signedFileUrl,
   updatePurchaseItem,
 } from './api'
-import { reviewSummary, SOURCE_LABEL, suggestProducts, titleCase, type Purchase, type PurchaseItem } from './domain'
+import { autoProductName, reviewSummary, SOURCE_LABEL, suggestProducts, titleCase, type Purchase, type PurchaseItem } from './domain'
 
 const NEW = '__new__'
 
@@ -181,7 +181,11 @@ export function ReviewPage() {
               <p className="font-medium">
                 {summary.toStock} {summary.toStock === 1 ? 'item entra' : 'itens entram'} no estoque
               </p>
-              {summary.unmatched > 0 && <p className="text-amber-700 dark:text-amber-400">{summary.unmatched} sem produto associado</p>}
+              {summary.newProducts > 0 && (
+                <p className="text-fg-muted">
+                  {summary.newProducts} {summary.newProducts === 1 ? 'produto novo será cadastrado' : 'produtos novos serão cadastrados'}
+                </p>
+              )}
             </div>
             <Button icon={<PackageCheck className="size-4" />} onClick={() => setConfirming(true)}>
               Confirmar
@@ -296,10 +300,10 @@ function ReviewRow({
               }}
               className={clsx(
                 'h-9 min-w-0 flex-1 rounded-lg border bg-surface px-2.5 text-[14px] focus:border-accent-500 focus:outline-none',
-                item.household_product_id ? 'border-border' : 'border-amber-400/70',
+                'border-border',
               )}
             >
-              <option value="">{suggestions.length ? 'Escolha o produto…' : 'Associar a um produto…'}</option>
+              <option value="">{suggestions.length ? 'Novo produto (ou escolha um existente…)' : 'Novo produto (cadastro automático)'}</option>
               {suggestions.length > 0 && (
                 <optgroup label="Sugestões">
                   {suggestions.map((s) => (
@@ -322,6 +326,11 @@ function ReviewRow({
               Ignorar
             </Button>
           </div>
+          {!item.household_product_id && (
+            <p className="text-[12px] text-accent-700 dark:text-accent-100">
+              Será cadastrado como produto novo: <span className="font-medium">{autoProductName(item.description)}</span>
+            </p>
+          )}
           {suggestions[0] && !item.household_product_id && (
             <button
               type="button"
@@ -377,9 +386,15 @@ function ConfirmBody({
         Confirmo que recebi os produtos marcados. <strong>{summary.toStock}</strong>{' '}
         {summary.toStock === 1 ? 'item entra' : 'itens entram'} no estoque como compra.
       </p>
-      {(summary.unmatched > 0 || summary.notReceived > 0) && (
+      {(summary.newProducts > 0 || summary.notReceived > 0) && (
         <ul className="list-disc space-y-1 pl-5 text-[13px] text-fg-muted">
-          {summary.unmatched > 0 && <li>{summary.unmatched} sem produto associado não entram no estoque.</li>}
+          {summary.newProducts > 0 && (
+            <li>
+              {summary.newProducts} {summary.newProducts === 1 ? 'item ainda não existe' : 'itens ainda não existem'} no cadastro e{' '}
+              {summary.newProducts === 1 ? 'será cadastrado' : 'serão cadastrados'} automaticamente (nome, embalagem e categoria
+              pelo cupom; ajuste depois em Estoque).
+            </li>
+          )}
           {summary.notReceived > 0 && <li>{summary.notReceived} desmarcados não entram no estoque.</li>}
         </ul>
       )}

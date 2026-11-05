@@ -92,6 +92,9 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
   novo não duplica. O mesmo comprovante (chave de acesso ou hash do arquivo) não vira duas compras.
 - **Original preservado**: arquivo no Storage privado (pasta da família, RLS) + resultado extraído
   (`raw_extraction`).
+- **Cadastro automático**: ao confirmar, itens sem produto (e não ignorados) viram produtos novos —
+  nome, embalagem e categoria sugeridos pela descrição do cupom, EAN quando houver, "quanto manter" =
+  quantidade comprada. Linhas iguais geram um só produto; rascunho descartado não cria nada.
 - **Histórico de preços**: último, média, menor, maior e variação por produto (só compras
   confirmadas, nunca sobrescritas). A lista de compras passa a estimar com o último preço pago.
 
@@ -203,7 +206,7 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
    (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`,
-   `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`, `20261110000100_financial_views.sql`, `20261111000100_list_suggestions.sql`). As das Fases 4 e 5 também
+   `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`, `20261110000100_financial_views.sql`, `20261111000100_list_suggestions.sql`, `20261112000100_auto_create_products.sql`). As das Fases 4 e 5 também
    criam os buckets privados `receipts` e `inventory-photos`.
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
