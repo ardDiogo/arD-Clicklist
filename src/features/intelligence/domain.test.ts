@@ -220,4 +220,14 @@ describe('insights do arD', () => {
     })
     expect(ins.map((i) => i.id)).toEqual(['frequent-s', 'overdue-c'])
   })
+
+  it('comprador com 60%+ dos gastos (exige 2 compradores identificados)', () => {
+    const b = (id: string | null, name: string, share: number) => ({
+      user_id: id, name, purchases: 2, total: share * 100, avg_ticket: 50, share, prev_total: 0, change_pct: null,
+      last_date: '2026-10-10', stores: 1, top_store: 'Mart Minas', products: 3, lines: 4,
+    })
+    expect(buildInsights({ range, buyers: [b('a', 'Diogo', 0.7), b('b', 'Ana', 0.3)] })[0]?.title).toBe('Diogo fez 70% dos gastos do período')
+    expect(buildInsights({ range, buyers: [b('a', 'Diogo', 0.9), b(null, 'Não informado', 0.1)] })).toEqual([])
+    expect(buildInsights({ range, buyers: [b('a', 'Diogo', 0.55), b('b', 'Ana', 0.45)] })).toEqual([])
+  })
 })

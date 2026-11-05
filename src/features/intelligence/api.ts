@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client'
-import type { DateRange, FilterOptions, IntelFilters, Overview, PricePoint, PriceStat, ProductsData, StoresData } from './types'
+import type { BuyerStat, DateRange, FilterOptions, IntelFilters, Overview, PricePoint, PriceStat, ProductsData, StoresData } from './types'
 
 function unwrap<T>(result: { data: unknown; error: unknown }): T {
   if (result.error) throw result.error
@@ -36,6 +36,10 @@ export async function getProducts(householdId: string, range: DateRange, f: Inte
 
 export async function getPrices(householdId: string, range: DateRange, f: IntelFilters): Promise<PriceStat[]> {
   return unwrap(await supabase().rpc('intel_prices', args(householdId, range, f)))
+}
+
+export async function getBuyers(householdId: string, range: DateRange, f: IntelFilters): Promise<BuyerStat[]> {
+  return unwrap(await supabase().rpc('intel_buyers', args(householdId, range, f)))
 }
 
 export async function getPriceHistory(householdId: string, productId: string, range: DateRange): Promise<PricePoint[]> {

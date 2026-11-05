@@ -639,6 +639,7 @@ export type Database = {
       intel_stores: { Args: IntelArgs; Returns: Json }
       intel_products: { Args: IntelArgs; Returns: Json }
       intel_prices: { Args: IntelArgs; Returns: Json }
+      intel_buyers: { Args: IntelArgs; Returns: Json }
       intel_price_history: {
         Args: { p_household_id: string; p_household_product_id: string; p_from: string; p_to: string }
         Returns: {

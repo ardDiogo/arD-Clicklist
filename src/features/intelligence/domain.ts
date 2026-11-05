@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/lib/format'
 import type {
+  BuyerStat,
   Confidence,
   DateRange,
   Insight,
@@ -182,9 +183,10 @@ export interface InsightInput {
   stores?: StoresData | null
   products?: ProductsData | null
   prices?: PriceStat[] | null
+  buyers?: BuyerStat[] | null
 }
 
-export function buildInsights({ range, overview, stores, products, prices }: InsightInput): Insight[] {
+export function buildInsights({ range, overview, stores, products, prices, buyers }: InsightInput): Insight[] {
   const out: Insight[] = []
   const period = rangeLabel(range)
 
@@ -358,6 +360,23 @@ export function buildInsights({ range, overview, stores, products, prices }: Ins
         source: 'Datas das compras confirmadas e estoque atual',
         confidence: confidenceFrom(overdue.purchase_days, 6, 4),
         tone: 'warning',
+      })
+    }
+  }
+
+  if (buyers) {
+    const named = buyers.filter((b) => b.user_id)
+    const top = named[0]
+    if (named.length >= 2 && top && top.share >= 0.6) {
+      out.push({
+        id: `buyer-share-${top.user_id}`,
+        title: `${top.name} fez ${fmtShare(top.share)} dos gastos do período`,
+        description: `${top.purchases} ${top.purchases === 1 ? 'compra' : 'compras'}, ${formatCurrency(top.total)} no total, ticket médio de ${formatCurrency(top.avg_ticket)}${top.top_store ? `, principalmente no ${top.top_store}` : ''}.`,
+        metric: `Participação ${fmtShare(top.share)}`,
+        period,
+        source: 'Campo “Comprado por” das compras confirmadas',
+        confidence: null,
+        tone: 'neutral',
       })
     }
   }

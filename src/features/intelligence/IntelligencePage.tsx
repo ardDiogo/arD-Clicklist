@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Alert, EmptyState } from '@/components/ui/feedback'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
-import { getFilterOptions, getMonthlyTotals, getOverview, getPrices, getProducts, getStores } from './api'
+import { getBuyers, getFilterOptions, getMonthlyTotals, getOverview, getPrices, getProducts, getStores } from './api'
 import { addMonthsDate, buildInsights, forecastNextMonth, todayBR } from './domain'
 import { FilterBar } from './FilterBar'
 import { FinanceTab } from './FinanceTab'
@@ -42,12 +42,13 @@ export function IntelligencePage() {
   const stores = useIntelQuery(ready ? `st:${fkey}` : null, () => getStores(hh, range, filters))
   const products = useIntelQuery(ready ? `pr:${fkey}` : null, () => getProducts(hh, range, filters))
   const prices = useIntelQuery(ready ? `pc:${fkey}` : null, () => getPrices(hh, range, filters))
+  const buyers = useIntelQuery(ready ? `by:${fkey}` : null, () => getBuyers(hh, range, filters))
   const monthly = useIntelQuery(ready ? `mo:${hh}` : null, () => getMonthlyTotals(hh, `${addMonthsDate(todayBR(), -7).slice(0, 7)}-01`))
 
   const allLoaded = overview.data && stores.data && products.data && prices.data
   const insights = useMemo(
-    () => (allLoaded ? buildInsights({ range, overview: overview.data, stores: stores.data, products: products.data, prices: prices.data }) : null),
-    [allLoaded, range, overview.data, stores.data, products.data, prices.data],
+    () => (allLoaded ? buildInsights({ range, overview: overview.data, stores: stores.data, products: products.data, prices: prices.data, buyers: buyers.data }) : null),
+    [allLoaded, range, overview.data, stores.data, products.data, prices.data, buyers.data],
   )
   const forecast = useMemo(() => (monthly.data ? forecastNextMonth(monthly.data) : null), [monthly.data])
   const itemFilter = !!(filters.category || filters.product || filters.brand)
@@ -103,7 +104,7 @@ export function IntelligencePage() {
         ) : !overview.data ? (
           <TabSkeleton />
         ) : (
-          <FinanceTab data={overview.data} forecast={forecast} insights={insights} onOpenInsights={() => state.setTab('insights')} itemFilter={itemFilter} />
+          <FinanceTab data={overview.data} buyers={buyers.data} buyersError={buyers.error} forecast={forecast} insights={insights} onOpenInsights={() => state.setTab('insights')} itemFilter={itemFilter} />
         )
       case 'mercados':
         return stores.error ? <TabError error={stores.error} /> : !stores.data ? <TabSkeleton /> : <StoresTab data={stores.data} />

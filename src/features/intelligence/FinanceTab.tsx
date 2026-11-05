@@ -1,19 +1,24 @@
 import { clsx } from 'clsx'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { BuyersSection } from './BuyersSection'
 import { SpendSeries, ShareBars, TicketBars } from './charts'
 import { bucketLabel, fmtDay, fmtPct, pctChange, rangeLabel } from './domain'
-import type { Insight, Overview } from './types'
+import type { BuyerStat, Insight, Overview } from './types'
 import { Delta, NotEnough, Section, Stat } from './ui'
 
 export function FinanceTab({
   data,
+  buyers,
+  buyersError,
   forecast,
   insights,
   onOpenInsights,
   itemFilter,
 }: {
   data: Overview
+  buyers: BuyerStat[] | null
+  buyersError: string | null
   forecast: { value: number; min: number; max: number; months: number } | null
   insights: Insight[] | null
   onOpenInsights: () => void
@@ -144,6 +149,8 @@ export function FinanceTab({
           </>
         )}
       </Section>
+
+      <BuyersSection buyers={buyers} error={buyersError} />
 
       <Section
         title="Ticket médio por compra"

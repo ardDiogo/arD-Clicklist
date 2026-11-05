@@ -178,6 +178,22 @@ export interface PricePoint {
   total_price: number
 }
 
+export interface BuyerStat {
+  user_id: string | null
+  name: string
+  purchases: number
+  total: number
+  avg_ticket: number
+  share: number
+  prev_total: number
+  change_pct: number | null
+  last_date: string
+  stores: number
+  top_store: string | null
+  products: number
+  lines: number
+}
+
 export interface FilterOptions {
   stores: { key: string; name: string; visits: number }[]
   categories: { id: string; name: string }[]
