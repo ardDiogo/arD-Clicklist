@@ -1,4 +1,3 @@
-import { ReceiptText } from 'lucide-react'
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -10,7 +9,8 @@ import { AcceptInvitePage, CreateHouseholdPage } from '@/features/household/page
 import { ProductFormPage } from '@/features/inventory/ProductFormPage'
 import { StockItemPage } from '@/features/inventory/StockItemPage'
 import { StockPage } from '@/features/inventory/StockPage'
-import { ComingSoonPage } from '@/features/placeholder/ComingSoonPage'
+import { PurchasesPage } from '@/features/receipts/PurchasesPage'
+import { ReviewPage } from '@/features/receipts/ReviewPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ListDetailPage, ListHistoryPage } from '@/features/shopping-list/HistoryPages'
 import { ShoppingListPage } from '@/features/shopping-list/ShoppingListPage'
@@ -58,17 +58,8 @@ const router = createBrowserRouter([
                   { path: '/lista', element: <ShoppingListPage /> },
                   { path: '/lista/historico', element: <ListHistoryPage /> },
                   { path: '/lista/:id', element: <ListDetailPage /> },
-                  {
-                    path: '/compras',
-                    element: (
-                      <ComingSoonPage
-                        title="Compras"
-                        icon={ReceiptText}
-                        phase={4}
-                        description="Importação de comprovantes (QR Code da NFC-e, XML ou foto) com revisão antes de atualizar o estoque."
-                      />
-                    ),
-                  },
+                  { path: '/compras', element: <PurchasesPage /> },
+                  { path: '/compras/:id', element: <ReviewPage /> },
                   { path: '/ajustes', element: <SettingsPage /> },
                 ],
               },

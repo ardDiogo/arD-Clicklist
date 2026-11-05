@@ -1,0 +1,505 @@
+import { clsx } from 'clsx'
+import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Trash2, Undo2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Dialog } from '@/components/ui/Dialog'
+import { SelectField, TextField } from '@/components/ui/Field'
+import { Alert, Badge, EmptyState } from '@/components/ui/feedback'
+import { FullPageSpinner } from '@/components/ui/Spinner'
+import { useToast } from '@/components/ui/Toast'
+import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
+import { can } from '@/features/household/roles'
+import { createTrackedProduct } from '@/features/inventory/api'
+import { formatQty, parseQty, productSubtitle, type StockItem } from '@/features/inventory/domain'
+import { useLocations, useStock } from '@/features/inventory/hooks'
+import { toMessage } from '@/lib/errors'
+import { formatCurrency, formatDateTime } from '@/lib/format'
+import {
+  confirmPurchase,
+  discardPurchase,
+  getPurchase,
+  getPurchaseFiles,
+  getPurchaseItems,
+  signedFileUrl,
+  updatePurchaseItem,
+} from './api'
+import { reviewSummary, SOURCE_LABEL, suggestProducts, titleCase, type Purchase, type PurchaseItem } from './domain'
+
+const NEW = '__new__'
+
+/**
+ * Aviso de leitura possivelmente incompleta: a soma dos itens não bate com o total,
+ * nem considerando o desconto geral. Tolerância evita alarmes por arredondamento.
+ */
+function totalMismatch(subtotal: number, total: number | null, discount: number | null): boolean {
+  if (total === null) return false
+  const tolerance = Math.max(1, total * 0.02)
+  return Math.abs(subtotal - total) > tolerance && Math.abs(subtotal - (total + (discount ?? 0))) > tolerance
+}
+
+export function ReviewPage() {
+  const { id = '' } = useParams()
+  const { household, role } = useCurrentHousehold()
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { data: stock, reload: reloadStock } = useStock(household.id)
+  const [purchase, setPurchase] = useState<Purchase | null | undefined>(undefined)
+  const [items, setItems] = useState<PurchaseItem[]>([])
+  const [files, setFiles] = useState<{ storage_path: string; mime_type: string }[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [creatingFor, setCreatingFor] = useState<PurchaseItem | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const [p, i, f] = await Promise.all([getPurchase(id), getPurchaseItems(id), getPurchaseFiles(id)])
+      setPurchase(p)
+      setItems(i)
+      setFiles(f)
+    } catch (e) {
+      setError(toMessage(e))
+    }
+  }, [id])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const editable = purchase?.status === 'draft' && can.edit(role)
+  const summary = useMemo(() => reviewSummary(items), [items])
+  const stockById = useMemo(() => new Map((stock ?? []).map((s) => [s.id, s])), [stock])
+
+  async function save(item: PurchaseItem, patch: Partial<PurchaseItem>) {
+    const next = { ...item, ...patch }
+    setItems((list) => list.map((i) => (i.id === item.id ? next : i)))
+    try {
+      await updatePurchaseItem(next)
+    } catch (e) {
+      toast.error(toMessage(e))
+      await load()
+    }
+  }
+
+  if (error) return <Alert>{error}</Alert>
+  if (purchase === undefined) return <FullPageSpinner />
+  if (!purchase) {
+    return (
+      <Card>
+        <EmptyState icon={Ban} title="Compra não encontrada" action={<Button variant="secondary" onClick={() => navigate('/compras')}>Voltar</Button>} />
+      </Card>
+    )
+  }
+
+  const subtotal = items.reduce((s, i) => s + Math.round(i.total_price * 100), 0) / 100
+
+  return (
+    <div className={clsx('space-y-5 animate-fade-in', editable && 'pb-24')}>
+      <Link to="/compras" className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted hover:text-fg">
+        <ArrowLeft className="size-4" /> Compras
+      </Link>
+
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.025em]">
+            {purchase.store_name ?? 'Estabelecimento não identificado'}
+          </h1>
+          {purchase.status === 'confirmed' && <Badge tone="accent">Confirmada</Badge>}
+          {purchase.status === 'discarded' && <Badge>Descartada</Badge>}
+        </div>
+        <p className="mt-1 text-[14px] text-fg-muted">
+          {formatDateTime(purchase.purchased_at ?? purchase.created_at)} · {SOURCE_LABEL[purchase.source]}
+          {purchase.total_amount !== null && ` · ${formatCurrency(purchase.total_amount)}`}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-3">
+          {files.map((f) => (
+            <OriginalFileLink key={f.storage_path} path={f.storage_path} mime={f.mime_type} />
+          ))}
+          {purchase.source_url && (
+            <a href={purchase.source_url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-[13px] text-fg-muted underline-offset-4 hover:text-fg hover:underline">
+              <ExternalLink className="size-3.5" /> Consulta na SEFAZ
+            </a>
+          )}
+        </div>
+      </div>
+
+      {purchase.status === 'draft' && (
+        <Alert tone="success">
+          Nada foi lançado no estoque ainda. Confira os produtos, desmarque o que não chegou e confirme.
+        </Alert>
+      )}
+      {totalMismatch(subtotal, purchase.total_amount, purchase.discount_amount) && (
+        <Alert>
+          A soma dos itens ({formatCurrency(subtotal)}) não bate com o total do cupom ({formatCurrency(purchase.total_amount)}). Confira se a leitura
+          pegou todos os itens.
+        </Alert>
+      )}
+
+      <Card className="overflow-hidden">
+        <ul className="divide-y divide-border">
+          {items.map((item) => (
+            <ReviewRow
+              key={item.id}
+              item={item}
+              editable={editable}
+              stock={stock ?? []}
+              matched={item.household_product_id ? stockById.get(item.household_product_id) : undefined}
+              onSave={(patch) => void save(item, patch)}
+              onCreate={() => setCreatingFor(item)}
+            />
+          ))}
+        </ul>
+      </Card>
+
+      {purchase.status === 'draft' && can.edit(role) && (
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            variant="danger"
+            icon={<Trash2 className="size-3.5" />}
+            onClick={async () => {
+              if (!confirm('Descartar esta leitura? Nada será lançado no estoque.')) return
+              try {
+                await discardPurchase(purchase.id)
+                toast.show('Leitura descartada')
+                navigate('/compras', { replace: true })
+              } catch (e) {
+                toast.error(toMessage(e))
+              }
+            }}
+          >
+            Descartar leitura
+          </Button>
+        </div>
+      )}
+
+      {editable && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.5rem)] z-10 border-t border-border bg-bg/90 backdrop-blur-xl lg:bottom-0 lg:left-60">
+          <div className="mx-auto flex max-w-3xl items-center gap-3 px-5 py-3 lg:px-10">
+            <div className="min-w-0 flex-1 text-[13px] leading-5">
+              <p className="font-medium">
+                {summary.toStock} {summary.toStock === 1 ? 'item entra' : 'itens entram'} no estoque
+              </p>
+              {summary.unmatched > 0 && <p className="text-amber-700 dark:text-amber-400">{summary.unmatched} sem produto associado</p>}
+            </div>
+            <Button icon={<PackageCheck className="size-4" />} onClick={() => setConfirming(true)}>
+              Confirmar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {creatingFor && (
+        <QuickCreateDialog
+          item={creatingFor}
+          householdId={household.id}
+          onClose={() => setCreatingFor(null)}
+          onCreated={async (newId) => {
+            const target = creatingFor
+            setCreatingFor(null)
+            await reloadStock()
+            await save(target, { household_product_id: newId, ignored: false })
+            toast.show('Produto criado e associado')
+          }}
+        />
+      )}
+
+      <Dialog open={confirming} onClose={() => setConfirming(false)} title="Confirmar recebimento">
+        <ConfirmBody
+          summary={summary}
+          onCancel={() => setConfirming(false)}
+          onConfirm={async () => {
+            try {
+              const applied = await confirmPurchase(purchase.id)
+              setConfirming(false)
+              toast.show(applied ? `Compra confirmada · ${applied} itens no estoque` : 'Compra confirmada')
+              await load()
+            } catch (e) {
+              toast.error(toMessage(e))
+            }
+          }}
+        />
+      </Dialog>
+    </div>
+  )
+}
+
+function ReviewRow({
+  item,
+  editable,
+  stock,
+  matched,
+  onSave,
+  onCreate,
+}: {
+  item: PurchaseItem
+  editable: boolean
+  stock: StockItem[]
+  matched: StockItem | undefined
+  onSave: (patch: Partial<PurchaseItem>) => void
+  onCreate: () => void
+}) {
+  const suggestions = useMemo(
+    () => (item.household_product_id ? [] : suggestProducts(item.description, stock)),
+    [item.description, item.household_product_id, stock],
+  )
+  const [qtyText, setQtyText] = useState(formatQty(item.stock_quantity))
+  useEffect(() => setQtyText(formatQty(item.stock_quantity)), [item.stock_quantity])
+
+  const active = !item.ignored && item.household_product_id && item.received && item.stock_quantity > 0
+
+  return (
+    <li className={clsx('space-y-2.5 px-4 py-3.5', item.ignored && 'opacity-60')}>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] leading-5 font-medium break-words">{item.description}</p>
+          <p className="text-[12px] text-fg-muted tabular-nums">
+            {formatQty(item.quantity)} {item.unit ?? 'UN'}
+            {item.unit_price !== null && ` × ${formatCurrency(item.unit_price)}`}
+            {item.discount > 0 && ` − ${formatCurrency(item.discount)} desc.`}
+          </p>
+        </div>
+        <p className="text-[14px] font-semibold tabular-nums">{formatCurrency(item.total_price)}</p>
+      </div>
+
+      {item.hint && !item.ignored && (
+        <p className="flex items-start gap-1.5 text-[12px] text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> {item.hint}
+        </p>
+      )}
+
+      {item.ignored ? (
+        <div className="flex items-center justify-between text-[13px] text-fg-muted">
+          <span>Não é item de estoque</span>
+          {editable && (
+            <Button size="sm" variant="ghost" icon={<Undo2 className="size-3.5" />} onClick={() => onSave({ ignored: false })}>
+              Desfazer
+            </Button>
+          )}
+        </div>
+      ) : !editable ? (
+        <p className="flex items-center gap-1.5 text-[13px] text-fg-muted">
+          {active ? <CheckCircle2 className="size-4 text-accent-600" /> : <Ban className="size-4" />}
+          {matched ? `${matched.product_name}${active ? ` · +${formatQty(item.stock_quantity)}` : ' · não lançado'}` : 'Sem produto associado'}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <select
+              aria-label={`Produto para ${item.description}`}
+              value={item.household_product_id ?? ''}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === NEW) return onCreate()
+                onSave({ household_product_id: v || null })
+              }}
+              className={clsx(
+                'h-9 min-w-0 flex-1 rounded-lg border bg-surface px-2.5 text-[14px] focus:border-accent-500 focus:outline-none',
+                item.household_product_id ? 'border-border' : 'border-amber-400/70',
+              )}
+            >
+              <option value="">{suggestions.length ? 'Escolha o produto…' : 'Associar a um produto…'}</option>
+              {suggestions.length > 0 && (
+                <optgroup label="Sugestões">
+                  {suggestions.map((s) => (
+                    <option key={`s-${s.id}`} value={s.id}>
+                      {s.product_name} {productSubtitle(s) && `· ${productSubtitle(s)}`}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="Estoque">
+                {stock.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.product_name} {productSubtitle(s) && `· ${productSubtitle(s)}`}
+                  </option>
+                ))}
+              </optgroup>
+              <option value={NEW}>+ Criar novo produto…</option>
+            </select>
+            <Button size="sm" variant="ghost" onClick={() => onSave({ ignored: true, household_product_id: null })} title="Não é item de estoque (ex.: sacola)">
+              Ignorar
+            </Button>
+          </div>
+          {suggestions[0] && !item.household_product_id && (
+            <button
+              type="button"
+              onClick={() => onSave({ household_product_id: suggestions[0]!.id })}
+              className="text-[12px] font-medium text-accent-700 hover:underline dark:text-accent-100"
+            >
+              Usar “{suggestions[0].product_name}”?
+            </button>
+          )}
+          {item.household_product_id && (
+            <div className="flex items-center gap-3 text-[13px]">
+              <label className="inline-flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={item.received} onChange={(e) => onSave({ received: e.target.checked })} className="size-4 accent-[var(--color-accent-600)]" />
+                Recebido
+              </label>
+              <label className="ml-auto inline-flex items-center gap-2 text-fg-muted">
+                Entra no estoque
+                <input
+                  inputMode="decimal"
+                  value={qtyText}
+                  disabled={!item.received}
+                  onChange={(e) => setQtyText(e.target.value)}
+                  onBlur={() => {
+                    const q = parseQty(qtyText)
+                    if (q === null) return setQtyText(formatQty(item.stock_quantity))
+                    if (q !== item.stock_quantity) onSave({ stock_quantity: q })
+                  }}
+                  className="h-8 w-16 rounded-lg border border-border bg-surface px-2 text-center text-[14px] tabular-nums focus:border-accent-500 focus:outline-none disabled:opacity-50"
+                />
+                <span className="text-[12px]">emb.</span>
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}
+
+function ConfirmBody({
+  summary,
+  onCancel,
+  onConfirm,
+}: {
+  summary: ReturnType<typeof reviewSummary>
+  onCancel: () => void
+  onConfirm: () => Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="space-y-4 text-[14px] leading-5">
+      <p>
+        Confirmo que recebi os produtos marcados. <strong>{summary.toStock}</strong>{' '}
+        {summary.toStock === 1 ? 'item entra' : 'itens entram'} no estoque como compra.
+      </p>
+      {(summary.unmatched > 0 || summary.notReceived > 0) && (
+        <ul className="list-disc space-y-1 pl-5 text-[13px] text-fg-muted">
+          {summary.unmatched > 0 && <li>{summary.unmatched} sem produto associado não entram no estoque.</li>}
+          {summary.notReceived > 0 && <li>{summary.notReceived} desmarcados não entram no estoque.</li>}
+        </ul>
+      )}
+      <p className="text-[13px] text-fg-muted">Os preços ficam no histórico e o app aprende a associar esses produtos da próxima vez.</p>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          Voltar
+        </Button>
+        <Button
+          loading={busy}
+          onClick={async () => {
+            setBusy(true)
+            try {
+              await onConfirm()
+            } finally {
+              setBusy(false)
+            }
+          }}
+        >
+          Confirmar compra
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function QuickCreateDialog({
+  item,
+  householdId,
+  onClose,
+  onCreated,
+}: {
+  item: PurchaseItem
+  householdId: string
+  onClose: () => void
+  onCreated: (id: string) => Promise<void>
+}) {
+  const { data: locations } = useLocations(householdId)
+  const [name, setName] = useState(titleCase(item.description))
+  const [brand, setBrand] = useState('')
+  const [locationId, setLocationId] = useState('')
+  const [ideal, setIdeal] = useState(String(Math.max(1, Math.round(item.stock_quantity || 1))))
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const idealQty = parseQty(ideal)
+    if (!name.trim()) return setError('Informe o nome.')
+    if (idealQty === null) return setError('Quantidade ideal inválida.')
+    setBusy(true)
+    setError(null)
+    try {
+      const id = await createTrackedProduct(householdId, {
+        name,
+        brandName: brand,
+        categoryId: null,
+        presentation: '',
+        packageSize: null,
+        unit: 'un',
+        barcode: item.ean ?? '',
+        idealQty,
+        notes: '',
+        locationId: locationId || null,
+        currentQty: 0,
+      })
+      await onCreated(id)
+    } catch (err) {
+      setError(toMessage(err))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="Novo produto">
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-[13px] text-fg-muted">
+          Do cupom: <span className="font-medium text-fg">{item.description}</span>
+        </p>
+        {error && <Alert>{error}</Alert>}
+        <TextField label="Nome" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label="Marca" value={brand} maxLength={60} onChange={(e) => setBrand(e.target.value)} />
+          <TextField label="Quanto manter" inputMode="decimal" value={ideal} onChange={(e) => setIdeal(e.target.value)} />
+        </div>
+        <SelectField label="Onde fica guardado" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+          <option value="">Sem ambiente</option>
+          {locations?.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </SelectField>
+        <p className="text-[12px] text-fg-subtle">
+          O estoque começa em zero; a quantidade da compra entra quando você confirmar. Detalhes podem ser completados depois.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={busy}>
+            Criar e associar
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
+function OriginalFileLink({ path, mime }: { path: string; mime: string }) {
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        const url = await signedFileUrl(path)
+        if (url) window.open(url, '_blank', 'noopener')
+      }}
+      className="inline-flex items-center gap-1 text-[13px] text-fg-muted underline-offset-4 hover:text-fg hover:underline"
+    >
+      <FileImage className="size-3.5" /> {mime.startsWith('image/') ? 'Ver foto original' : 'Ver XML original'}
+    </button>
+  )
+}

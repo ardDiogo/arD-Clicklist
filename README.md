@@ -15,8 +15,8 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 | 1 — Fundação | Projeto, PWA, Auth, família, convites, papéis, RLS | ✅ Implementada |
 | 2 — Produtos e estoque | Categorias, marcas, produtos, ambientes, movimentações | ✅ Implementada |
 | 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ✅ Implementada |
-| 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | ⏳ Próxima |
-| 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | — |
+| 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | ✅ Implementada |
+| 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | ⏳ Próxima |
 | 6 — Financeiro | Histórico de preços, gastos, indicadores | — |
 
 ### O que a Fase 1 entrega (funcional, não só tela)
@@ -70,7 +70,28 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
   Uma nova lista é aberta automaticamente.
 - **Histórico**: listas anteriores com itens comprados/não comprados e total estimado.
 
-A tela de Compras (comprovantes) aparece como "Chega na Fase 4": nada nela é simulado.
+### O que a Fase 4 entrega
+
+- **Três formas de importar**: QR Code da NFC-e (câmera, foto do QR ou link colado), arquivo
+  XML (NF-e/NFC-e) e foto do cupom lida por IA (Gemini, via Edge Function).
+- **Leitura ≠ estoque**: toda importação vira um **rascunho**. Nada muda no estoque até a
+  confirmação explícita ("Confirmo que recebi…").
+- **Revisão**: associação automática (EAN aprendido → código de barras do produto →
+  descrição aprendida por estabelecimento), sugestões por semelhança para cupons abreviados,
+  criar produto na hora, ignorar itens que não são de estoque (sacola), desmarcar o que não
+  chegou, ajustar a quantidade que entra (itens por peso entram como 1 embalagem), aviso se a
+  soma dos itens não bate com o total e aviso de possível duplicidade com lista finalizada.
+- **Confirmação transacional e idempotente**: entradas de estoque, custo por embalagem,
+  aprendizado de apelidos e marcação automática da lista aberta — tudo ou nada; confirmar de
+  novo não duplica. O mesmo comprovante (chave de acesso ou hash do arquivo) não vira duas compras.
+- **Original preservado**: arquivo no Storage privado (pasta da família, RLS) + resultado extraído
+  (`raw_extraction`).
+- **Histórico de preços**: último, média, menor, maior e variação por produto (só compras
+  confirmadas, nunca sobrescritas). A lista de compras passa a estimar com o último preço pago.
+
+**Limitações conhecidas**: o leitor da página da SEFAZ cobre o layout padrão (tabela `tabResult`,
+usado por SP, RS/SVRS e vários estados) e foi testado com um exemplo desse layout, não contra os
+portais reais. Se o seu estado usar outro layout, o app avisa e sugere foto ou XML.
 
 ---
 
@@ -87,6 +108,7 @@ src/
     household/         # API (RPCs), HouseholdProvider, onboarding, convite, papéis
     inventory/         # Estoque: domínio (regras puras), API, hooks realtime, telas
     shopping-list/     # Lista de compras: domínio, API, hooks realtime, telas, histórico
+    receipts/          # Comprovantes: parsers fiscais (QR/HTML/XML), importação, revisão, preços
     settings/          # Família, membros/convites, ambientes, aparência, conta
     dashboard/
     placeholder/       # Telas "Chega na Fase X"
@@ -96,7 +118,7 @@ src/
 supabase/
   migrations/          # SQL versionado (fonte da verdade do banco)
   tests/               # Testes SQL de RLS/regras + stub mínimo do Supabase
-  functions/           # Edge Functions (a partir da Fase 4: IA, NFC-e)
+  functions/           # Edge Functions: nfce-proxy (SEFAZ) e receipt-ai (Gemini)
 scripts/test-db.sh     # Sobe Postgres temporário e roda os testes SQL
 ```
 
@@ -141,7 +163,8 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 ### 1. Supabase
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
-   (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`).
+   (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`,
+   `20261108000100_purchases.sql`). A da Fase 4 também cria o bucket privado `receipts`.
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
    - *Site URL*: a URL da Vercel (ex.: `https://seu-app.vercel.app`).
@@ -156,6 +179,15 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 2. Em *Environment Variables*, defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
    (o nome antigo `VITE_SUPABASE_ANON_KEY` também é aceito).
 
-### 3. IA (somente a partir da Fase 4)
-Chave do Gemini como secret das Edge Functions (`npx supabase secrets set GEMINI_API_KEY=...`).
-Nunca em variáveis `VITE_*`.
+### 3. Edge Functions (Fase 4)
+Pelo painel (sem instalar nada): **Edge Functions → Deploy a new function → Via Editor**.
+
+| Função | Arquivo | Precisa de |
+| --- | --- | --- |
+| `nfce-proxy` | `supabase/functions/nfce-proxy/index.ts` | nada |
+| `receipt-ai` | `supabase/functions/receipt-ai/index.ts` | secret `GEMINI_API_KEY` |
+
+Use exatamente esses nomes e mantenha "Verify JWT" ligado. A chave do Gemini é gratuita em
+<https://aistudio.google.com/apikey> e vai em **Edge Functions → Secrets** (nunca em `VITE_*`).
+Opcional: `GEMINI_MODEL` (padrão `gemini-2.5-flash`). Sem a chave, QR Code e XML funcionam e a
+opção de foto mostra uma mensagem explicando o que falta.

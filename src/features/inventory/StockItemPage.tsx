@@ -16,6 +16,7 @@ import { formatDateTime } from '@/lib/format'
 import { archiveItem, getStockItem, listMovements, recordMovement, transferItem, type Movement } from './api'
 import { StatusPill, Stepper } from './components'
 import { formatQty, MOVEMENT_LABEL, newIdempotencyKey, parseQty, productSubtitle, type StockItem } from './domain'
+import { PriceCard } from '@/features/receipts/PriceCard'
 import { useLocations } from './hooks'
 import { useQuickMovement } from './useQuickMovement'
 
@@ -126,6 +127,8 @@ export function StockItemPage() {
         </>
       )}
 
+      <PriceCard householdProductId={item.id} />
+
       <Card>
         <CardHeader title="Histórico" description="Toda alteração de quantidade fica registrada." />
         {movements && movements.length > 0 ? (
@@ -225,8 +228,8 @@ function CountCard({ item, onDone }: { item: StockItem; onDone: () => Promise<vo
       <div className="-mt-2 flex gap-2 px-5 pb-5">
         <Button
           size="sm"
-          variant="ghost"
-          className="-ml-3 text-danger"
+          variant="danger"
+          className="-ml-3"
           disabled={item.current_qty === 0 || saving}
           onClick={async () => {
             setSaving(true)

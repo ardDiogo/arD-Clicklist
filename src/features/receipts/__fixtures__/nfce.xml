@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe><infNFe Id="NFe35261112345678000190650010000123451000123456" versao="4.00">
+    <ide><cUF>35</cUF><mod>65</mod><dhEmi>2026-11-07T18:30:12-03:00</dhEmi></ide>
+    <emit><CNPJ>12345678000190</CNPJ><xNome>SUPERMERCADO EXEMPLO LTDA</xNome><xFant>Mercado Exemplo</xFant></emit>
+    <det nItem="1"><prod><cProd>001</cProd><cEAN>7896000000017</cEAN><xProd>KETCHUP BONARE ZERO 380G</xProd>
+      <uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>8.9900000000</vUnCom><vProd>17.98</vProd><cEANTrib>7896000000017</cEANTrib></prod></det>
+    <det nItem="2"><prod><cProd>002</cProd><cEAN>SEM GTIN</cEAN><xProd>P&#195;O FRANC&#202;S KG</xProd>
+      <uCom>KG</uCom><qCom>0.5320</qCom><vUnCom>15.0000000000</vUnCom><vProd>7.98</vProd><vDesc>0.50</vDesc></prod></det>
+    <det nItem="3"><prod><cProd>003</cProd><cEAN>7891000100103</cEAN><xProd>LEITE &amp; CIA 1L</xProd>
+      <uCom>UN</uCom><qCom>6.0000</qCom><vUnCom>4.7900000000</vUnCom><vProd>28.74</vProd></prod></det>
+    <total><ICMSTot><vProd>54.70</vProd><vDesc>0.50</vDesc><vNF>54.20</vNF></ICMSTot></total>
+  </infNFe></NFe>
+  <protNFe><infProt><chNFe>35261112345678000190650010000123451000123456</chNFe></infProt></protNFe>
+</nfeProc>

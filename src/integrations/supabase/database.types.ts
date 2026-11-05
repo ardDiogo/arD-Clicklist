@@ -12,6 +12,8 @@ export type StockMovementSource = 'manual' | 'purchase' | 'inventory_scan' | 'sy
 export type StockStatus = 'untracked' | 'out' | 'low' | 'ok'
 export type ShoppingListStatus = 'open' | 'completed' | 'cancelled'
 export type ShoppingItemOrigin = 'manual' | 'stock' | 'suggestion'
+export type PurchaseStatus = 'draft' | 'confirmed' | 'discarded'
+export type PurchaseSource = 'nfce_qrcode' | 'xml' | 'photo' | 'manual'
 
 export type Database = {
   public: {
@@ -211,6 +213,75 @@ export type Database = {
         Update: never
         Relationships: []
       }
+      purchases: {
+        Row: {
+          id: string
+          household_id: string
+          status: PurchaseStatus
+          source: PurchaseSource
+          store_name: string | null
+          store_cnpj: string | null
+          purchased_at: string | null
+          access_key: string | null
+          file_sha256: string | null
+          source_url: string | null
+          total_amount: number | null
+          discount_amount: number | null
+          raw_extraction: Json
+          notes: string | null
+          created_by: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      purchase_files: {
+        Row: {
+          id: string
+          household_id: string
+          purchase_id: string | null
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          sha256: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      purchase_items: {
+        Row: {
+          id: string
+          purchase_id: string
+          household_id: string
+          line_number: number
+          description: string
+          ean: string | null
+          quantity: number
+          unit: string | null
+          unit_price: number | null
+          discount: number
+          total_price: number
+          household_product_id: string | null
+          match_source: 'alias_ean' | 'barcode' | 'alias_description' | 'user' | null
+          received: boolean
+          ignored: boolean
+          stock_quantity: number
+          unit_cost: number | null
+          hint: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       audit_log: {
         Row: {
           id: number
@@ -254,6 +325,41 @@ export type Database = {
           last_movement_at: string | null
           created_at: string
           updated_at: string
+        }
+        Relationships: []
+      }
+      product_price_history: {
+        Row: {
+          id: string
+          household_id: string
+          household_product_id: string
+          purchase_id: string
+          store_name: string | null
+          store_cnpj: string | null
+          purchased_at: string
+          description: string
+          quantity: number
+          unit: string | null
+          unit_price: number | null
+          discount: number
+          total_price: number
+          stock_quantity: number
+          unit_cost: number
+        }
+        Relationships: []
+      }
+      household_product_prices: {
+        Row: {
+          household_product_id: string
+          household_id: string
+          purchases: number
+          last_price: number
+          last_store: string | null
+          last_purchased_at: string
+          avg_price: number
+          min_price: number
+          max_price: number
+          previous_price: number | null
         }
         Relationships: []
       }
@@ -356,6 +462,30 @@ export type Database = {
         Args: { p_list_id: string; p_apply_to_stock?: boolean }
         Returns: { applied_items: number }[]
       }
+      register_purchase_file: {
+        Args: { p_household_id: string; p_storage_path: string; p_mime_type: string; p_size_bytes: number; p_sha256: string }
+        Returns: string
+      }
+      create_purchase_draft: {
+        Args: { p_household_id: string; p_source: PurchaseSource; p_data: Json; p_file_id?: string | null }
+        Returns: string
+      }
+      update_purchase_item: {
+        Args: {
+          p_item_id: string
+          p_household_product_id: string | null
+          p_received: boolean
+          p_ignored: boolean
+          p_stock_quantity: number
+        }
+        Returns: undefined
+      }
+      update_purchase_header: {
+        Args: { p_purchase_id: string; p_store_name: string | null; p_purchased_at: string | null }
+        Returns: undefined
+      }
+      confirm_purchase: { Args: { p_purchase_id: string }; Returns: { applied_items: number }[] }
+      discard_purchase: { Args: { p_purchase_id: string }; Returns: undefined }
       remove_household_member: {
         Args: { p_household_id: string; p_user_id: string }
         Returns: undefined
@@ -368,6 +498,8 @@ export type Database = {
       stock_movement_source: StockMovementSource
       shopping_list_status: ShoppingListStatus
       shopping_item_origin: ShoppingItemOrigin
+      purchase_status: PurchaseStatus
+      purchase_source: PurchaseSource
     }
     CompositeTypes: { [_ in never]: never }
   }

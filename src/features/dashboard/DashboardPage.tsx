@@ -26,7 +26,6 @@ interface Module {
 }
 
 const NEXT_MODULES: Module[] = [
-  { icon: ReceiptText, title: 'Comprovantes', description: 'QR Code da NFC-e atualiza o estoque após sua confirmação.', phase: 4 },
   { icon: Camera, title: 'Inventário por fotos', description: 'Fotografe os armários para conferir o estoque.', phase: 5 },
 ]
 
@@ -123,6 +122,21 @@ export function DashboardPage() {
             )}
           </Card>
         </section>
+      )}
+
+      {can.edit(role) && (
+        <Link to="/compras" className="mt-5 block">
+          <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+            <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+              <ReceiptText className="size-[18px]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-medium">Registrar compra</p>
+              <p className="text-[12px] text-fg-muted">QR Code, foto ou XML do cupom fiscal.</p>
+            </div>
+            <ChevronRight className="size-4 text-fg-subtle" />
+          </Card>
+        </Link>
       )}
 
       <h2 className="mt-8 mb-3 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Em construção</h2>
