@@ -45,13 +45,13 @@ jobs:
         run: |
           for fn in nfce-proxy receipt-ai inventory-ai; do
             echo "::group::$fn"
-            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt --yes
             echo "::endgroup::"
           done
 
       - name: Gravar GEMINI_API_KEY nas funções
         if: ${{ env.GEMINI_API_KEY != '' }}
-        run: supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY" --project-ref "$PROJECT_REF"
+        run: supabase secrets set GEMINI_API_KEY="$GEMINI_API_KEY" --project-ref "$PROJECT_REF" --yes
 
       - name: Resumo
         run: supabase functions list --project-ref "$PROJECT_REF"
