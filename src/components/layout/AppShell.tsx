@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { Boxes, House, ListChecks, ReceiptText, Settings, type LucideIcon } from 'lucide-react'
+import { BarChart3, Boxes, House, ListChecks, ReceiptText, Settings, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { useHousehold } from '@/features/household/HouseholdProvider'
@@ -11,6 +11,8 @@ interface NavItem {
   to: string
   label: string
   icon: LucideIcon
+  /** No celular a barra tem 5 posições; itens extras ficam só no menu lateral. */
+  desktopOnly?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -18,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/estoque', label: 'Estoque', icon: Boxes },
   { to: '/lista', label: 'Lista', icon: ListChecks },
   { to: '/compras', label: 'Compras', icon: ReceiptText },
+  { to: '/financeiro', label: 'Financeiro', icon: BarChart3, desktopOnly: true },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
@@ -97,7 +100,7 @@ export function AppShell() {
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
       >
         <div className="mx-auto grid max-w-md grid-cols-5">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {NAV_ITEMS.filter((i) => !i.desktopOnly).map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

@@ -17,7 +17,7 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 | 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ✅ Implementada |
 | 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | ✅ Implementada |
 | 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | ✅ Implementada |
-| 6 — Financeiro | Histórico de preços, gastos, indicadores | ⏳ Próxima |
+| 6 — Financeiro | Histórico de preços, gastos, indicadores | ✅ Implementada |
 
 ### O que a Fase 1 entrega (funcional, não só tela)
 
@@ -107,6 +107,19 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 - **Registro**: fotos, data, ambiente, detecções, quantidades estimadas e confirmadas,
   confiança e responsável ficam salvos.
 
+### O que a Fase 6 entrega
+
+- **Painel Financeiro** (menu lateral no desktop; no celular, pelo Início ou por Compras):
+  gasto do mês com variação vs. mês anterior, média mensal, valor médio da compra e
+  previsão da próxima compra (data pelo intervalo médio entre compras, mínimo de 3; valor pela
+  lista aberta ou, sem preços, pela média — sempre identificado como estimativa).
+- **Gráficos**: gasto por mês (3/6/12 meses, toque para escolher o mês, tabela acessível) e gastos
+  por categoria do mês selecionado; maiores variações de preço; histórico por estabelecimento.
+- **Dados reais**: views `purchase_totals`, `monthly_spending`, `category_spending`,
+  `store_spending` e `price_changes` sobre compras **confirmadas**, com `security_invoker`
+  (RLS por família) e meses no fuso de Brasília. Sem compras, o painel mostra um estado vazio
+  explicativo — nenhum número fictício.
+
 **Limitações conhecidas**: o leitor da página da SEFAZ cobre o layout padrão (tabela `tabResult`,
 usado por SP, RS/SVRS e vários estados) e foi testado com um exemplo desse layout, não contra os
 portais reais. Se o seu estado usar outro layout, o app avisa e sugere foto ou XML.
@@ -128,6 +141,7 @@ src/
     shopping-list/     # Lista de compras: domínio, API, hooks realtime, telas, histórico
     receipts/          # Comprovantes: parsers fiscais (QR/HTML/XML), importação, revisão, preços
     inventory-scan/    # Inventário por fotos: envio, análise, revisão por confiança, ajustes
+    analytics/         # Financeiro: indicadores, gráficos, previsão
     settings/          # Família, membros/convites, ambientes, aparência, conta
     dashboard/
     placeholder/       # Telas "Chega na Fase X"
@@ -183,7 +197,7 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
    (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`,
-   `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`). As das Fases 4 e 5 também
+   `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`, `20261110000100_financial_views.sql`). As das Fases 4 e 5 também
    criam os buckets privados `receipts` e `inventory-photos`.
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:

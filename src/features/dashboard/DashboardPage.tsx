@@ -1,9 +1,8 @@
-import { BarChart3, Camera, ChevronRight, ListChecks, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
+import { BarChart3, Camera, ChevronRight, ListChecks, Plus, ReceiptText } from 'lucide-react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/feedback'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
@@ -17,17 +16,6 @@ function greeting(date = new Date()): string {
   if (h < 18) return 'Boa tarde'
   return 'Boa noite'
 }
-
-interface Module {
-  icon: LucideIcon
-  title: string
-  description: string
-  phase: number
-}
-
-const NEXT_MODULES: Module[] = [
-  { icon: BarChart3, title: 'Painel financeiro', description: 'Gastos por mês e categoria, evolução de preços e previsão.', phase: 6 },
-]
 
 export function DashboardPage() {
   const { user } = useAuth()
@@ -154,23 +142,18 @@ export function DashboardPage() {
         </Link>
       )}
 
-      <h2 className="mt-8 mb-3 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Em construção</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {NEXT_MODULES.map(({ icon: Icon, title, description, phase }) => (
-          <Card key={title} className="flex gap-3 p-4">
-            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-muted text-fg-muted">
-              <Icon className="size-[18px]" strokeWidth={1.75} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-[14px] font-medium">{title}</p>
-                <Badge>Fase {phase}</Badge>
-              </div>
-              <p className="mt-0.5 text-[13px] leading-5 text-fg-muted">{description}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <Link to="/financeiro" className="mt-3 block">
+        <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+          <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+            <BarChart3 className="size-[18px]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium">Financeiro</p>
+            <p className="text-[12px] text-fg-muted">Gastos do mês, categorias, preços e previsão da próxima compra.</p>
+          </div>
+          <ChevronRight className="size-4 text-fg-subtle" />
+        </Card>
+      </Link>
     </>
   )
 }

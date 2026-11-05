@@ -426,6 +426,60 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_totals: {
+        Row: {
+          id: string
+          household_id: string
+          purchased_at: string
+          month: string
+          store_name: string
+          store_cnpj: string | null
+          source: PurchaseSource
+          total: number
+          item_count: number
+        }
+        Relationships: []
+      }
+      monthly_spending: {
+        Row: { household_id: string; month: string; total: number; purchases: number; avg_ticket: number }
+        Relationships: []
+      }
+      category_spending: {
+        Row: { household_id: string; month: string; category_name: string; category_sort: number; total: number; items: number }
+        Relationships: []
+      }
+      store_spending: {
+        Row: {
+          household_id: string
+          store_key: string
+          store_name: string
+          visits: number
+          total: number
+          avg_ticket: number
+          last_visit: string
+        }
+        Relationships: []
+      }
+      price_changes: {
+        Row: {
+          household_product_id: string
+          household_id: string
+          product_name: string
+          brand_name: string | null
+          presentation: string | null
+          package_size: number | null
+          unit: MeasureUnit
+          last_price: number
+          previous_price: number | null
+          min_price: number
+          max_price: number
+          avg_price: number
+          purchases: number
+          last_purchased_at: string
+          variation_pct: number | null
+        }
+        Relationships: []
+      }
       shopping_list_items_view: {
         Row: {
           id: string

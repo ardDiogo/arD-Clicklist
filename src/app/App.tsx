@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/ui/Toast'
+import { FinancePage } from '@/features/analytics/FinancePage'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from '@/features/auth/pages'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
                   { path: '/lista/:id', element: <ListDetailPage /> },
                   { path: '/compras', element: <PurchasesPage /> },
                   { path: '/compras/:id', element: <ReviewPage /> },
+                  { path: '/financeiro', element: <FinancePage /> },
                   { path: '/ajustes', element: <SettingsPage /> },
                 ],
               },

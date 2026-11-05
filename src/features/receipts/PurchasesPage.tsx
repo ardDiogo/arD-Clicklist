@@ -1,7 +1,8 @@
-import { ChevronRight, FileCode2, QrCode, ReceiptText, ScanText } from 'lucide-react'
+import { BarChart3, ChevronRight, FileCode2, QrCode, ReceiptText, ScanText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog } from '@/components/ui/Dialog'
 import { Alert, Badge, EmptyState } from '@/components/ui/feedback'
@@ -73,7 +74,17 @@ export function PurchasesPage() {
 
   return (
     <>
-      <PageHeader title="Compras" description="Comprovantes atualizam o estoque depois da sua revisão." />
+      <PageHeader
+        title="Compras"
+        description="Comprovantes atualizam o estoque depois da sua revisão."
+        action={
+          <Link to="/financeiro">
+            <Button size="sm" variant="ghost" icon={<BarChart3 className="size-4" />}>
+              Financeiro
+            </Button>
+          </Link>
+        }
+      />
 
       {canEdit && (
         <section className="mb-6 space-y-3">
