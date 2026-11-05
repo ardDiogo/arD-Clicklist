@@ -65,6 +65,14 @@ export function useIntelState() {
   }
 }
 
+/** Mensagem amigável + detalhe técnico (código e texto do banco) para diagnóstico. */
+function describe(e: unknown): string {
+  const friendly = toMessage(e)
+  const o = (typeof e === 'object' && e !== null ? e : {}) as { message?: string; code?: string; details?: string; hint?: string }
+  const tech = [o.code, o.message, o.details, o.hint].filter(Boolean).join(' · ')
+  return tech && tech !== friendly ? `${friendly} [${tech}]` : friendly
+}
+
 // Cache durante a visita à tela: trocar de aba não refaz consultas já feitas.
 const cache = new Map<string, unknown>()
 export function clearIntelCache() {
@@ -86,7 +94,7 @@ export function useIntelQuery<T>(key: string | null, fetcher: () => Promise<T>) 
         cache.set(key, data)
         if (active) setState({ key, data, error: null })
       },
-      (e) => active && setState({ key, data: null, error: toMessage(e) }),
+      (e) => active && setState({ key, data: null, error: describe(e) }),
     )
     return () => {
       active = false

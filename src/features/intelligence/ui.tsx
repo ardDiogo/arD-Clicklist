@@ -133,7 +133,8 @@ export function TabError({ error }: { error: string }) {
   return (
     <Alert>
       Não foi possível carregar esta análise: {error}
-      {/função|function|does not exist|schema cache/i.test(error) && ' — rode a migration 20261118000100_purchase_intelligence.sql no Supabase.'}
+      {/PGRST202|42883|function|schema cache/i.test(error) && ' — rode a migration 20261118000100_purchase_intelligence.sql no Supabase.'}
+      {/42703|bought_by/i.test(error) && ' — rode antes a migration 20261117000100_purchase_buyer.sql e depois a 20261118000100_purchase_intelligence.sql.'}
     </Alert>
   )
 }
