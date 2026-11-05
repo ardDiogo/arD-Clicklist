@@ -1,4 +1,4 @@
-import { ListChecks, ReceiptText } from 'lucide-react'
+import { ReceiptText } from 'lucide-react'
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -12,6 +12,8 @@ import { StockItemPage } from '@/features/inventory/StockItemPage'
 import { StockPage } from '@/features/inventory/StockPage'
 import { ComingSoonPage } from '@/features/placeholder/ComingSoonPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { ListDetailPage, ListHistoryPage } from '@/features/shopping-list/HistoryPages'
+import { ShoppingListPage } from '@/features/shopping-list/ShoppingListPage'
 import { useTheme } from '@/hooks/useTheme'
 import { isSupabaseConfigured } from '@/lib/env'
 import { RequireAuth, RequireHousehold } from './guards'
@@ -53,17 +55,9 @@ const router = createBrowserRouter([
                   { path: '/estoque/novo', element: <ProductFormPage /> },
                   { path: '/estoque/:id', element: <StockItemPage /> },
                   { path: '/estoque/:id/editar', element: <ProductFormPage /> },
-                  {
-                    path: '/lista',
-                    element: (
-                      <ComingSoonPage
-                        title="Lista de compras"
-                        icon={ListChecks}
-                        phase={3}
-                        description="Lista compartilhada em tempo real, gerada a partir do que falta em casa."
-                      />
-                    ),
-                  },
+                  { path: '/lista', element: <ShoppingListPage /> },
+                  { path: '/lista/historico', element: <ListHistoryPage /> },
+                  { path: '/lista/:id', element: <ListDetailPage /> },
                   {
                     path: '/compras',
                     element: (

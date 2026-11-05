@@ -10,6 +10,8 @@ export type MeasureUnit = 'un' | 'g' | 'kg' | 'ml' | 'l'
 export type StockMovementType = 'purchase' | 'consumption' | 'inventory_adjustment' | 'correction' | 'transfer'
 export type StockMovementSource = 'manual' | 'purchase' | 'inventory_scan' | 'system'
 export type StockStatus = 'untracked' | 'out' | 'low' | 'ok'
+export type ShoppingListStatus = 'open' | 'completed' | 'cancelled'
+export type ShoppingItemOrigin = 'manual' | 'stock' | 'suggestion'
 
 export type Database = {
   public: {
@@ -169,6 +171,46 @@ export type Database = {
         Update: never
         Relationships: []
       }
+      shopping_lists: {
+        Row: {
+          id: string
+          household_id: string
+          name: string
+          status: ShoppingListStatus
+          stock_applied_at: string | null
+          created_by: string | null
+          completed_by: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      shopping_list_items: {
+        Row: {
+          id: string
+          list_id: string
+          household_id: string
+          household_product_id: string | null
+          custom_name: string | null
+          quantity: number
+          origin: ShoppingItemOrigin
+          manually_edited: boolean
+          estimated_unit_price: number | null
+          notes: string | null
+          checked_at: string | null
+          checked_by: string | null
+          removed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       audit_log: {
         Row: {
           id: number
@@ -210,6 +252,36 @@ export type Database = {
           status: StockStatus
           notes: string | null
           last_movement_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Relationships: []
+      }
+      shopping_list_items_view: {
+        Row: {
+          id: string
+          list_id: string
+          household_id: string
+          household_product_id: string | null
+          name: string
+          presentation: string | null
+          package_size: number | null
+          unit: MeasureUnit | null
+          brand_name: string | null
+          category_id: string | null
+          category_name: string
+          category_sort: number
+          location_name: string | null
+          ideal_qty: number | null
+          current_qty: number | null
+          quantity: number
+          origin: ShoppingItemOrigin
+          manually_edited: boolean
+          estimated_unit_price: number | null
+          estimated_total: number | null
+          notes: string | null
+          checked_at: string | null
+          checked_by: string | null
           created_at: string
           updated_at: string
         }
@@ -261,6 +333,29 @@ export type Database = {
       }
       archive_household_product: { Args: { p_household_product_id: string }; Returns: undefined }
       archive_location: { Args: { p_location_id: string }; Returns: undefined }
+      get_or_create_open_list: { Args: { p_household_id: string }; Returns: string | null }
+      generate_shopping_list: {
+        Args: { p_household_id: string }
+        Returns: { list_id: string; added: number; updated: number; removed: number }[]
+      }
+      add_product_to_list: {
+        Args: { p_list_id: string; p_household_product_id: string; p_quantity?: number }
+        Returns: string
+      }
+      add_custom_item_to_list: {
+        Args: { p_list_id: string; p_name: string; p_quantity?: number }
+        Returns: string
+      }
+      update_list_item: {
+        Args: { p_item_id: string; p_quantity: number; p_estimated_unit_price?: number | null; p_notes?: string | null }
+        Returns: undefined
+      }
+      set_list_item_checked: { Args: { p_item_id: string; p_checked: boolean }; Returns: undefined }
+      remove_list_item: { Args: { p_item_id: string }; Returns: undefined }
+      complete_shopping_list: {
+        Args: { p_list_id: string; p_apply_to_stock?: boolean }
+        Returns: { applied_items: number }[]
+      }
       remove_household_member: {
         Args: { p_household_id: string; p_user_id: string }
         Returns: undefined
@@ -271,6 +366,8 @@ export type Database = {
       measure_unit: MeasureUnit
       stock_movement_type: StockMovementType
       stock_movement_source: StockMovementSource
+      shopping_list_status: ShoppingListStatus
+      shopping_item_origin: ShoppingItemOrigin
     }
     CompositeTypes: { [_ in never]: never }
   }

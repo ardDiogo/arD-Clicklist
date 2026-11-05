@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${RUN_AS[@]}" initdb -D "$WORK/data" -U postgres --auth=trust >/dev/null
+"${RUN_AS[@]}" initdb -D "$WORK/data" -U postgres --auth=trust --encoding=UTF8 --locale=C.UTF-8 >/dev/null
 "${RUN_AS[@]}" pg_ctl -D "$WORK/data" -o "-p $PORT -k $WORK -c listen_addresses=''" -l "$WORK/log" -w start >/dev/null
 
 PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -X -q -v ON_ERROR_STOP=1)

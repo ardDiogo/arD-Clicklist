@@ -1,0 +1,121 @@
+import { supabase } from '@/integrations/supabase/client'
+import type { Tables } from '@/integrations/supabase/database.types'
+import type { ListItem } from './domain'
+
+export type ShoppingList = Tables<'shopping_lists'>
+
+function unwrap<T>(result: { data: T | null; error: unknown }): T {
+  if (result.error) throw result.error
+  return result.data as T
+}
+
+export async function getOpenList(householdId: string): Promise<ShoppingList | null> {
+  return unwrap(
+    await supabase().from('shopping_lists').select('*').eq('household_id', householdId).eq('status', 'open').maybeSingle(),
+  )
+}
+
+export async function getList(id: string): Promise<ShoppingList | null> {
+  return unwrap(await supabase().from('shopping_lists').select('*').eq('id', id).maybeSingle())
+}
+
+export async function listItems(listId: string): Promise<ListItem[]> {
+  return unwrap(await supabase().from('shopping_list_items_view').select('*').eq('list_id', listId))
+}
+
+/** IDs de produtos removidos pelo usuário nesta lista (não sugerir de novo). */
+export async function removedProductIds(listId: string): Promise<Set<string>> {
+  const rows = unwrap(
+    await supabase()
+      .from('shopping_list_items')
+      .select('household_product_id')
+      .eq('list_id', listId)
+      .not('removed_at', 'is', null),
+  )
+  return new Set(rows.map((r) => r.household_product_id).filter((x): x is string => Boolean(x)))
+}
+
+export async function generateList(householdId: string) {
+  const rows = unwrap(await supabase().rpc('generate_shopping_list', { p_household_id: householdId }))
+  return rows[0] ?? null
+}
+
+export async function addProduct(listId: string, householdProductId: string, quantity = 1): Promise<string> {
+  return unwrap(
+    await supabase().rpc('add_product_to_list', {
+      p_list_id: listId,
+      p_household_product_id: householdProductId,
+      p_quantity: quantity,
+    }),
+  )
+}
+
+export async function addCustomItem(listId: string, name: string, quantity = 1): Promise<string> {
+  return unwrap(await supabase().rpc('add_custom_item_to_list', { p_list_id: listId, p_name: name.trim(), p_quantity: quantity }))
+}
+
+export async function updateItem(
+  itemId: string,
+  quantity: number,
+  estimatedUnitPrice: number | null,
+  notes: string | null,
+): Promise<void> {
+  unwrap(
+    await supabase().rpc('update_list_item', {
+      p_item_id: itemId,
+      p_quantity: quantity,
+      p_estimated_unit_price: estimatedUnitPrice,
+      p_notes: notes,
+    }),
+  )
+}
+
+export async function setChecked(itemId: string, checked: boolean): Promise<void> {
+  unwrap(await supabase().rpc('set_list_item_checked', { p_item_id: itemId, p_checked: checked }))
+}
+
+export async function removeItem(itemId: string): Promise<void> {
+  unwrap(await supabase().rpc('remove_list_item', { p_item_id: itemId }))
+}
+
+export async function completeList(listId: string, applyToStock: boolean): Promise<number> {
+  const rows = unwrap(await supabase().rpc('complete_shopping_list', { p_list_id: listId, p_apply_to_stock: applyToStock }))
+  return rows[0]?.applied_items ?? 0
+}
+
+export interface ListSummary extends ShoppingList {
+  itemCount: number
+  estimatedTotal: number | null
+}
+
+export async function listHistory(householdId: string, limit = 30): Promise<ListSummary[]> {
+  const client = supabase()
+  const lists = unwrap(
+    await client
+      .from('shopping_lists')
+      .select('*')
+      .eq('household_id', householdId)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(limit),
+  )
+  if (lists.length === 0) return []
+  const items = unwrap(
+    await client
+      .from('shopping_list_items_view')
+      .select('list_id, estimated_total, checked_at')
+      .in(
+        'list_id',
+        lists.map((l) => l.id),
+      ),
+  )
+  return lists.map((l) => {
+    const mine = items.filter((i) => i.list_id === l.id && i.checked_at)
+    const priced = mine.filter((i) => i.estimated_total !== null)
+    return {
+      ...l,
+      itemCount: mine.length,
+      estimatedTotal: priced.length ? priced.reduce((s, i) => s + Math.round((i.estimated_total ?? 0) * 100), 0) / 100 : null,
+    }
+  })
+}

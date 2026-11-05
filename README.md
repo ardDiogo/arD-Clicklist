@@ -14,8 +14,8 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 | --- | --- | --- |
 | 1 — Fundação | Projeto, PWA, Auth, família, convites, papéis, RLS | ✅ Implementada |
 | 2 — Produtos e estoque | Categorias, marcas, produtos, ambientes, movimentações | ✅ Implementada |
-| 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ⏳ Próxima |
-| 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | — |
+| 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ✅ Implementada |
+| 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | ⏳ Próxima |
 | 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | — |
 | 6 — Financeiro | Histórico de preços, gastos, indicadores | — |
 
@@ -53,7 +53,24 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
   para a mesma família; leitores (viewer) só leem.
 - **Painel**: números reais (produtos, para repor, em falta) e lista do que precisa repor.
 
-Telas de Lista e Compras aparecem como "Chega na Fase X": nada nelas é simulado.
+### O que a Fase 3 entrega
+
+- **Lista automática**: uma lista aberta por família, criada e preenchida sozinha a partir do
+  estoque (comprar = ideal − atual). Gerar de novo **não duplica** e **não sobrescreve** itens
+  manuais, quantidades ajustadas, itens marcados ou removidos pelo usuário. Itens automáticos
+  que deixam de faltar saem da lista.
+- **Aviso inteligente**: "N produtos estão faltando e não estão na lista — Incluir".
+- **Inclusão manual**: busca no estoque ou item avulso; se já estiver na lista, soma a quantidade.
+  Origem registrada (`stock` / `manual`).
+- **Modo mercado**: agrupada por categoria, marcar com um toque, "No carrinho" separado,
+  −/+ de quantidade, preço unitário e observação por item, total estimado (claramente
+  identificado como estimativa, com contagem de itens sem preço). Tempo real entre membros.
+- **Finalizar compra**: opcionalmente lança os itens marcados no estoque como compra, após
+  confirmação explícita ("Confirmo que recebi…"); idempotente (finalizar duas vezes não duplica).
+  Uma nova lista é aberta automaticamente.
+- **Histórico**: listas anteriores com itens comprados/não comprados e total estimado.
+
+A tela de Compras (comprovantes) aparece como "Chega na Fase 4": nada nela é simulado.
 
 ---
 
@@ -69,6 +86,7 @@ src/
     auth/              # AuthProvider, páginas, redirect seguro
     household/         # API (RPCs), HouseholdProvider, onboarding, convite, papéis
     inventory/         # Estoque: domínio (regras puras), API, hooks realtime, telas
+    shopping-list/     # Lista de compras: domínio, API, hooks realtime, telas, histórico
     settings/          # Família, membros/convites, ambientes, aparência, conta
     dashboard/
     placeholder/       # Telas "Chega na Fase X"
@@ -123,7 +141,7 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 ### 1. Supabase
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
-   (`20261105000100_foundation.sql`, depois `20261106000100_catalog_stock.sql`).
+   (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`).
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
    - *Site URL*: a URL da Vercel (ex.: `https://seu-app.vercel.app`).

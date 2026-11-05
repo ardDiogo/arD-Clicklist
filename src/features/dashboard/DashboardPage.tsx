@@ -26,7 +26,6 @@ interface Module {
 }
 
 const NEXT_MODULES: Module[] = [
-  { icon: ListChecks, title: 'Lista automática', description: 'Gerada pela diferença entre o ideal e o que há em casa.', phase: 3 },
   { icon: ReceiptText, title: 'Comprovantes', description: 'QR Code da NFC-e atualiza o estoque após sua confirmação.', phase: 4 },
   { icon: Camera, title: 'Inventário por fotos', description: 'Fotografe os armários para conferir o estoque.', phase: 5 },
 ]
@@ -69,6 +68,21 @@ export function DashboardPage() {
             </Link>
           )}
         </Card>
+      )}
+
+      {restock.length > 0 && (
+        <Link to="/lista" className="mt-5 block">
+          <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+            <div className="grid size-9 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100">
+              <ListChecks className="size-[18px]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-medium">Abrir lista de compras</p>
+              <p className="text-[12px] text-fg-muted">Montada automaticamente com o que falta em casa.</p>
+            </div>
+            <ChevronRight className="size-4 text-fg-subtle" />
+          </Card>
+        </Link>
       )}
 
       {restock.length > 0 && (
