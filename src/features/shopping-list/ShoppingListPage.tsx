@@ -1,4 +1,4 @@
-import { CalendarClock, Camera, History, ListChecks, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
+import { CalendarClock, Camera, History, ListChecks, RefreshCw, RotateCcw, ShoppingCart, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -13,7 +13,7 @@ import { ListSkeleton } from '@/features/inventory/components'
 import { useStock } from '@/features/inventory/hooks'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency } from '@/lib/format'
-import { addCustomItem, addProduct, completeList, generateList, removeItem, setChecked, suggestFromHistory, updateItem } from './api'
+import { addCustomItem, addProduct, completeList, generateList, removeItem, resetList, setChecked, suggestFromHistory, updateItem } from './api'
 import { AddItemBar, ListRow } from './components'
 import { listTotals, missingFromList, organizeList, type ListItem } from './domain'
 import { useOpenShoppingList } from './hooks'
@@ -28,6 +28,7 @@ export function ShoppingListPage() {
   const [syncing, setSyncing] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const { pending, checked } = useMemo(() => organizeList(items), [items])
   const totals = useMemo(() => listTotals(items), [items])
@@ -153,6 +154,7 @@ export function ShoppingListPage() {
               suggesting={suggesting}
               onSuggest={() => void suggest()}
               onPhotos={() => navigate('/inventario?voltar=lista')}
+              onReset={items.length > 0 ? () => setResetting(true) : undefined}
             />
           )}
 
@@ -236,6 +238,30 @@ export function ShoppingListPage() {
           checkedCount={totals.checkedCount}
           canEdit={canEdit}
           onFinish={() => setFinishing(true)}
+        />
+      )}
+
+      {list && (
+        <ResetDialog
+          open={resetting}
+          itemCount={items.length}
+          checkedCount={totals.checkedCount}
+          onClose={() => setResetting(false)}
+          onConfirm={async () => {
+            try {
+              const r = await resetList(household.id, 3)
+              setResetting(false)
+              await reload()
+              const added = (r?.added_from_stock ?? 0) + (r?.added_from_history ?? 0)
+              toast.show(
+                added
+                  ? `Lista recomeçada: ${added} ${added === 1 ? 'item' : 'itens'} (${r?.added_from_stock ?? 0} pelo estoque, ${r?.added_from_history ?? 0} pelo consumo)`
+                  : 'Lista recomeçada: nada falta em casa no momento',
+              )
+            } catch (e) {
+              toast.error(toMessage(e))
+            }
+          }}
         />
       )}
 
@@ -366,16 +392,29 @@ function BuildListCard({
   suggesting,
   onSuggest,
   onPhotos,
+  onReset,
 }: {
   suggesting: boolean
   onSuggest: () => void
   onPhotos: () => void
+  onReset?: () => void
 }) {
   const option =
     'flex min-w-0 items-start gap-3 rounded-xl border border-border bg-surface p-3.5 text-left shadow-card transition-[background-color,transform] hover:bg-surface-muted/60 active:scale-[0.99] disabled:opacity-60'
   return (
     <section aria-label="Montar a lista">
-      <h2 className="mb-2 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Montar a lista</h2>
+      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+        <h2 className="text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Montar a lista</h2>
+        {onReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+          >
+            <RotateCcw className="size-3.5" /> Recomeçar lista
+          </button>
+        )}
+      </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
         <button type="button" className={option} onClick={onSuggest} disabled={suggesting}>
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100">
@@ -401,5 +440,57 @@ function BuildListCard({
         </button>
       </div>
     </section>
+  )
+}
+
+/** Confirmação antes de recomeçar: a ação apaga ajustes manuais e itens no carrinho. */
+function ResetDialog({
+  open,
+  itemCount,
+  checkedCount,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  itemCount: number
+  checkedCount: number
+  onClose: () => void
+  onConfirm: () => Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <Dialog open={open} onClose={onClose} title="Recomeçar a lista?">
+      <div className="space-y-4 text-[14px] leading-5">
+        <p className="text-fg-muted">
+          Os {itemCount} {itemCount === 1 ? 'item atual sai' : 'itens atuais saem'} da lista
+          {checkedCount > 0 ? `, inclusive ${checkedCount} já ${checkedCount === 1 ? 'marcado' : 'marcados'} no carrinho` : ''}. Ajustes
+          manuais e itens avulsos também são apagados.
+        </p>
+        <p>
+          A lista é montada de novo com <strong>o que falta em casa</strong> (quanto manter − estoque atual) e completada pelo{' '}
+          <strong>consumo dos últimos 3 meses</strong>.
+        </p>
+        <p className="text-[13px] text-fg-subtle">Estoque, compras e listas anteriores não são alterados.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button
+            loading={busy}
+            icon={<RotateCcw className="size-4" />}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                await onConfirm()
+              } finally {
+                setBusy(false)
+              }
+            }}
+          >
+            Recomeçar
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   )
 }

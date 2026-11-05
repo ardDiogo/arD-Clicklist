@@ -572,6 +572,10 @@ export type Database = {
           removed_by_user?: number
         }[]
       }
+      reset_shopping_list: {
+        Args: { p_household_id: string; p_months?: number }
+        Returns: { list_id: string; removed_items: number; added_from_stock: number; added_from_history: number }[]
+      }
       add_product_to_list: {
         Args: { p_list_id: string; p_household_product_id: string; p_quantity?: number }
         Returns: string

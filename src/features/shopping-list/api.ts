@@ -46,6 +46,12 @@ export async function suggestFromHistory(householdId: string, months = 3) {
   return rows[0] ?? null
 }
 
+/** Limpa a lista aberta e monta de novo pelo estoque + consumo dos últimos meses. */
+export async function resetList(householdId: string, months = 3) {
+  const rows = unwrap(await supabase().rpc('reset_shopping_list', { p_household_id: householdId, p_months: months }))
+  return rows[0] ?? null
+}
+
 export async function addProduct(listId: string, householdProductId: string, quantity = 1): Promise<string> {
   return unwrap(
     await supabase().rpc('add_product_to_list', {
