@@ -3,7 +3,7 @@
 // os produtos identificados, quantidades estimadas e grau de confiança.
 // NÃO altera o estoque: o app grava como rascunho e o usuário revisa e confirma.
 //
-// Secrets: GEMINI_API_KEY (obrigatório), GEMINI_MODEL (opcional; padrão gemini-2.5-flash, com alternativas automáticas).
+// Secrets: GEMINI_API_KEY (obrigatório), GEMINI_MODEL (opcional; padrão gemini-3.8-flash, com alternativas automáticas).
 // Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
 // (o verificador do painel não aceita as chaves de assinatura novas do Supabase).
 // Segurança: fotos, conferência e catálogo são lidos com o token do PRÓPRIO usuário (RLS).
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) return json({ error: 'Análise por fotos ainda não configurada (falta GEMINI_API_KEY).' }, 503)
   const models = [
-    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'].filter((m): m is string => !!m)),
+    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter((m): m is string => !!m)),
   ]
 
   let scanId: string

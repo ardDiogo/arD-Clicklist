@@ -240,5 +240,5 @@ Pelo painel (sem instalar nada): **Edge Functions → Deploy a new function → 
 Use exatamente esses nomes e **desligue "Verify JWT"** (Enforce JWT verification): as funções validam
 a sessão por conta própria, e o verificador do painel não aceita as chaves de assinatura novas do Supabase. A chave do Gemini é gratuita em
 <https://aistudio.google.com/apikey> e vai em **Edge Functions → Secrets** (nunca em `VITE_*`).
-Opcional: `GEMINI_MODEL` (padrão `gemini-2.5-flash`). Sem a chave, QR Code e XML funcionam e a
+Opcional: `GEMINI_MODEL` (padrão `gemini-3.8-flash`). Sem a chave, QR Code e XML funcionam e a
 opção de foto mostra uma mensagem explicando o que falta.

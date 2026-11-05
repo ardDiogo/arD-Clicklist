@@ -4,7 +4,7 @@
 //
 // Secrets necessários (Edge Functions → Secrets):
 //   GEMINI_API_KEY   chave do Google AI Studio (https://aistudio.google.com/apikey)
-//   GEMINI_MODEL     opcional (padrão: gemini-2.5-flash; se indisponível, tenta gemini-flash-latest e gemini-2.0-flash)
+//   GEMINI_MODEL     opcional (padrão: gemini-3.8-flash; se indisponível, tenta gemini-flash-latest)
 // SUPABASE_URL e SUPABASE_ANON_KEY já são fornecidos automaticamente.
 //
 // Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) return json({ error: 'Leitura por foto ainda não configurada (falta GEMINI_API_KEY).' }, 503)
   const models = [
-    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'].filter((m): m is string => !!m)),
+    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter((m): m is string => !!m)),
   ]
 
   let fileId: string
