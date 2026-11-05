@@ -214,7 +214,7 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
    (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`,
    `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`, `20261110000100_financial_views.sql`, `20261111000100_list_suggestions.sql`, `20261112000100_auto_create_products.sql`, `20261113000100_list_suggestions_reasons.sql`,
-   `20261114000100_reset_shopping_list.sql`, `20261115000100_rename_purchase_store.sql`, `20261116000100_edit_remove_purchases.sql`, `20261117000100_purchase_buyer.sql`). As das Fases 4 e 5 também
+   `20261114000100_reset_shopping_list.sql`, `20261115000100_rename_purchase_store.sql`, `20261116000100_edit_remove_purchases.sql`, `20261117000100_purchase_buyer.sql`, `20261118000100_purchase_intelligence.sql`). As das Fases 4 e 5 também
    criam os buckets privados `receipts` e `inventory-photos`.
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
