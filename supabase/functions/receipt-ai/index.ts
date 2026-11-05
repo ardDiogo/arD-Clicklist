@@ -4,7 +4,7 @@
 //
 // Secrets necessários (Edge Functions → Secrets):
 //   GEMINI_API_KEY   chave do Google AI Studio (https://aistudio.google.com/apikey)
-//   GEMINI_MODEL     opcional (padrão: gemini-2.5-flash)
+//   GEMINI_MODEL     opcional (padrão: gemini-2.5-flash; se indisponível, tenta gemini-flash-latest e gemini-2.0-flash)
 // SUPABASE_URL e SUPABASE_ANON_KEY já são fornecidos automaticamente.
 //
 // Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
@@ -79,6 +79,51 @@ function toBase64(bytes: Uint8Array): string {
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const digits = (v: unknown) => (typeof v === 'string' ? v.replace(/\D/g, '') : '')
 
+// Chama o Gemini tentando modelos alternativos se o configurado não existir mais.
+// Devolve o texto JSON gerado ou um erro amigável com o motivo informado pelo Google.
+async function callGemini(apiKey: string, models: string[], body: unknown): Promise<{ text: string; model: string } | { error: string; status: number }> {
+  let last: { error: string; status: number } = { error: 'O serviço de IA não respondeu. Tente novamente em instantes.', status: 502 }
+  for (const model of models) {
+    let res: Response
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      last = { error: 'Não foi possível conectar ao Gemini. Tente novamente em instantes.', status: 502 }
+      continue
+    }
+    if (res.ok) {
+      const out = await res.json().catch(() => null)
+      const text = out?.candidates?.[0]?.content?.parts?.[0]?.text
+      if (typeof text === 'string') return { text, model }
+      const reason = out?.promptFeedback?.blockReason ?? out?.candidates?.[0]?.finishReason ?? 'resposta vazia'
+      return { error: `O Gemini não devolveu resultado (${reason}). Tente outra foto.`, status: 502 }
+    }
+    const raw = await res.text()
+    console.error('Gemini error', model, res.status, raw)
+    let msg = ''
+    try {
+      msg = JSON.parse(raw)?.error?.message ?? ''
+    } catch {
+      msg = raw.slice(0, 200)
+    }
+    // Modelo inexistente/indisponível: tenta o próximo da lista.
+    if (res.status === 404 || /not found|not supported for generateContent|is not available/i.test(msg)) {
+      last = { error: `Modelo do Gemini indisponível (${model}).`, status: 502 }
+      continue
+    }
+    if (/API key not valid|API_KEY_INVALID/i.test(msg)) return { error: 'Chave do Gemini inválida. Confira o secret GEMINI_API_KEY no Supabase.', status: 502 }
+    if (res.status === 403) return { error: `A chave do Gemini não tem permissão: ${msg.slice(0, 160)}`, status: 502 }
+    if (res.status === 429) return { error: 'Limite de uso do Gemini atingido. Aguarde alguns minutos e tente de novo.', status: 429 }
+    if (/location is not supported/i.test(msg)) return { error: 'O Gemini não está disponível na região do servidor do Supabase.', status: 502 }
+    return { error: `O Gemini recusou a análise (${res.status}): ${msg.slice(0, 200) || 'sem detalhes'}`, status: 502 }
+  }
+  return last
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405)
@@ -88,7 +133,9 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) return json({ error: 'Leitura por foto ainda não configurada (falta GEMINI_API_KEY).' }, 503)
-  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
+  const models = [
+    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'].filter((m): m is string => !!m)),
+  ]
 
   let fileId: string
   try {
@@ -118,23 +165,16 @@ Deno.serve(async (req) => {
   if (dlErr || !blob) return json({ error: 'Não foi possível ler a imagem' }, 404)
 
   const bytes = new Uint8Array(await blob.arrayBuffer())
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
+  const result = await callGemini(apiKey, models, {
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: file.mime_type, data: toBase64(bytes) } }, { text: PROMPT }] }],
       generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
-    }),
-  })
-  if (!res.ok) {
-    console.error('Gemini error', res.status, await res.text())
-    return json({ error: 'O serviço de IA não respondeu. Tente novamente em instantes.' }, 502)
-  }
+    })
+  if ('error' in result) return json({ error: result.error }, result.status)
+  const model = result.model
 
   let parsed: Record<string, unknown>
   try {
-    const out = await res.json()
-    parsed = JSON.parse(out?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}')
+    parsed = JSON.parse(result.text)
   } catch {
     return json({ error: 'Não foi possível interpretar a resposta da IA' }, 502)
   }
