@@ -18,19 +18,26 @@ function unwrap<T>(result: { data: T | null; error: unknown }): T {
   return result.data as T
 }
 
-/** Erro amigável vindo de uma Edge Function ({ error: "..." }). */
-async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
+/** Erro amigável vindo de uma Edge Function ({ error: "..." }). Falha de rede: tenta mais uma vez. */
+async function invoke<T>(name: string, body: Record<string, unknown>, attempt = 1): Promise<T> {
   const { data, error } = await supabase().functions.invoke(name, { body })
   if (error) {
     if (error instanceof FunctionsHttpError) {
       const payload = await error.context.json().catch(() => null)
       throw new Error(payload?.error ?? 'O serviço não respondeu. Tente novamente.')
     }
-    throw new Error(
-      /Failed to send|fetch/i.test(error.message)
-        ? `Serviço indisponível. Verifique se a função "${name}" foi publicada no Supabase (com "Verify JWT" desligado).`
-        : error.message,
-    )
+    if (/Failed to send|fetch|network|load failed/i.test(error.message)) {
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1500))
+        return invoke<T>(name, body, attempt + 1)
+      }
+      throw new Error(
+        typeof navigator !== 'undefined' && !navigator.onLine
+          ? 'Sem internet no momento.'
+          : `A conexão com o serviço "${name}" caiu ou demorou demais. Tente de novo em instantes.`,
+      )
+    }
+    throw new Error(error.message)
   }
   return data as T
 }
