@@ -561,6 +561,10 @@ export type Database = {
         Args: { p_household_id: string }
         Returns: { list_id: string; added: number; updated: number; removed: number }[]
       }
+      suggest_shopping_from_history: {
+        Args: { p_household_id: string; p_months?: number; p_reference?: string | null }
+        Returns: { list_id: string; added: number; months_with_data: number }[]
+      }
       add_product_to_list: {
         Args: { p_list_id: string; p_household_product_id: string; p_quantity?: number }
         Returns: string

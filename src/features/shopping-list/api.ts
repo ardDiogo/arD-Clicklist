@@ -40,6 +40,12 @@ export async function generateList(householdId: string) {
   return rows[0] ?? null
 }
 
+/** Sugestão pelo consumo médio dos últimos meses (compras repõem o consumo). */
+export async function suggestFromHistory(householdId: string, months = 3) {
+  const rows = unwrap(await supabase().rpc('suggest_shopping_from_history', { p_household_id: householdId, p_months: months }))
+  return rows[0] ?? null
+}
+
 export async function addProduct(listId: string, householdProductId: string, quantity = 1): Promise<string> {
   return unwrap(
     await supabase().rpc('add_product_to_list', {

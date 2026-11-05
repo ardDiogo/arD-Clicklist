@@ -115,6 +115,7 @@ export function ListRow({
   const [open, setOpen] = useState(false)
   const checked = Boolean(item.checked_at)
   const subtitle = [
+    item.origin === 'suggestion' ? 'Sugestão' : null,
     item.household_product_id ? productSubtitle({ ...item, unit: item.unit ?? 'un' }) : 'Item avulso',
     item.notes,
   ]
@@ -234,7 +235,16 @@ function ItemDetails({
     }
   }
 
-  const origin = item.origin === 'stock' ? (item.manually_edited ? 'Do estoque, ajustado por você' : 'Do estoque') : 'Incluído manualmente'
+  const origin =
+    item.origin === 'stock'
+      ? item.manually_edited
+        ? 'Do estoque, ajustado por você'
+        : 'Do estoque'
+      : item.origin === 'suggestion'
+        ? item.manually_edited
+          ? 'Sugerido pelo consumo, ajustado por você'
+          : 'Sugerido pelo consumo médio dos últimos meses'
+        : 'Incluído manualmente'
 
   return (
     <form onSubmit={save} className="space-y-3 px-4 pb-4 pl-[60px] animate-fade-in">

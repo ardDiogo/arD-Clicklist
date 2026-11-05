@@ -1,4 +1,4 @@
-import { History, ListChecks, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
+import { CalendarClock, History, ListChecks, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -13,7 +13,7 @@ import { ListSkeleton } from '@/features/inventory/components'
 import { useStock } from '@/features/inventory/hooks'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency } from '@/lib/format'
-import { addCustomItem, addProduct, completeList, generateList, removeItem, setChecked, updateItem } from './api'
+import { addCustomItem, addProduct, completeList, generateList, removeItem, setChecked, suggestFromHistory, updateItem } from './api'
 import { AddItemBar, ListRow } from './components'
 import { listTotals, missingFromList, organizeList, type ListItem } from './domain'
 import { useOpenShoppingList } from './hooks'
@@ -25,6 +25,7 @@ export function ShoppingListPage() {
   const { list, items, removed, loading, error, reload, patchItem } = useOpenShoppingList(household.id, canEdit)
   const { data: stock } = useStock(household.id)
   const [syncing, setSyncing] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   const [finishing, setFinishing] = useState(false)
 
   const { pending, checked } = useMemo(() => organizeList(items), [items])
@@ -51,6 +52,25 @@ export function ShoppingListPage() {
       toast.error(toMessage(e))
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function suggest() {
+    setSuggesting(true)
+    try {
+      const r = await suggestFromHistory(household.id, 3)
+      await reload()
+      if (!r || r.months_with_data === 0) {
+        toast.show('Ainda não há compras dos últimos 3 meses para calcular o consumo')
+      } else if (r.added === 0) {
+        toast.show('Nada novo: a lista já cobre o consumo médio dos últimos meses')
+      } else {
+        toast.show(`+${r.added} ${r.added === 1 ? 'item sugerido' : 'itens sugeridos'} pelo consumo dos últimos ${r.months_with_data} meses`)
+      }
+    } catch (e) {
+      toast.error(toMessage(e))
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -146,7 +166,7 @@ export function ShoppingListPage() {
               <EmptyState
                 icon={ShoppingCart}
                 title="Nada para comprar"
-                description="O estoque está em dia. Itens que acabarem aparecem aqui automaticamente."
+                description="O estoque está em dia. Itens que acabarem aparecem aqui automaticamente — ou use a sugestão pelo consumo dos últimos meses."
               />
             </Card>
           ) : (
@@ -185,11 +205,22 @@ export function ShoppingListPage() {
             </>
           )}
 
-          {canEdit && missing.length === 0 && items.length > 0 && (
-            <div className="flex justify-center">
-              <Button size="sm" variant="ghost" loading={syncing} icon={<RefreshCw className="size-3.5" />} onClick={() => void sync()}>
-                Atualizar pelo estoque
+          {canEdit && (
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={suggesting}
+                icon={<CalendarClock className="size-3.5" />}
+                onClick={() => void suggest()}
+              >
+                Sugerir pelo consumo dos últimos meses
               </Button>
+              {missing.length === 0 && items.length > 0 && (
+                <Button size="sm" variant="ghost" loading={syncing} icon={<RefreshCw className="size-3.5" />} onClick={() => void sync()}>
+                  Atualizar pelo estoque
+                </Button>
+              )}
             </div>
           )}
         </div>
