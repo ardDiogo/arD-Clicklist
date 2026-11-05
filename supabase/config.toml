@@ -1,0 +1,12 @@
+# Configuração mínima do Supabase CLI (usada pelo GitHub Actions para publicar as funções).
+project_id = "ffobtptwztsykwlflnme"
+
+# As funções validam a sessão por conta própria (compatível com as chaves novas do Supabase).
+[functions.nfce-proxy]
+verify_jwt = false
+
+[functions.receipt-ai]
+verify_jwt = false
+
+[functions.inventory-ai]
+verify_jwt = false

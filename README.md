@@ -223,6 +223,12 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
    (o nome antigo `VITE_SUPABASE_ANON_KEY` também é aceito).
 
 ### 3. Edge Functions (Fase 4)
+**Automático (recomendado):** o workflow `.github/workflows/deploy-functions.yml` publica as 3 funções
+sempre que elas mudam no `main`. Basta cadastrar em GitHub → Settings → Secrets and variables → Actions:
+`SUPABASE_ACCESS_TOKEN` (token pessoal do Supabase) e, opcionalmente, `GEMINI_API_KEY`. Para rodar na hora:
+aba Actions → "Publicar Edge Functions" → Run workflow.
+
+**Manual:**
 Pelo painel (sem instalar nada): **Edge Functions → Deploy a new function → Via Editor**.
 
 | Função | Arquivo | Precisa de |
