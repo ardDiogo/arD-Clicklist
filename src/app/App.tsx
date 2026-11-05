@@ -70,6 +70,10 @@ const router = createBrowserRouter([
                     lazy: async () => ({ Component: (await import('@/features/intelligence/IntelligencePage')).IntelligencePage }),
                   },
                   { path: '/financeiro', element: <Navigate to="/inteligencia" replace /> },
+                  {
+                    path: '/churrasco',
+                    lazy: async () => ({ Component: (await import('@/features/churrasco/ChurrascoPage')).ChurrascoPage }),
+                  },
                   { path: '/ajustes', element: <SettingsPage /> },
                 ],
               },
