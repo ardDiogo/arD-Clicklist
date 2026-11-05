@@ -135,6 +135,11 @@ export async function setIdealQty(id: string, idealQty: number): Promise<void> {
   unwrap(await supabase().from('household_products').update({ ideal_qty: idealQty }).eq('id', id))
 }
 
+/** "Não envia à lista": o produto não entra sozinho na lista de compras. Retorna quantos itens saíram da lista aberta. */
+export async function setListExclusion(id: string, exclude: boolean): Promise<number> {
+  return unwrap(await supabase().rpc('set_product_list_exclusion', { p_household_product_id: id, p_exclude: exclude }))
+}
+
 export async function archiveItem(id: string): Promise<void> {
   unwrap(await supabase().rpc('archive_household_product', { p_household_product_id: id }))
 }

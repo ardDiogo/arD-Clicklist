@@ -37,6 +37,7 @@ function item(partial: Partial<StockItem>): StockItem {
     last_movement_at: null,
     created_at: '',
     updated_at: '',
+    exclude_from_list: false,
     ...partial,
   }
 }

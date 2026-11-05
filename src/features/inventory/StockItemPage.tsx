@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { Archive, ArrowLeft, ArrowRightLeft, ClipboardCheck, History, Pencil, ShoppingCart } from 'lucide-react'
+import { Archive, ArrowLeft, ArrowRightLeft, ClipboardCheck, History, ListX, Pencil, ShoppingCart } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
@@ -13,7 +13,7 @@ import { can } from '@/features/household/roles'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
-import { archiveItem, getStockItem, listMovements, recordMovement, transferItem, type Movement } from './api'
+import { archiveItem, getStockItem, setListExclusion, listMovements, recordMovement, transferItem, type Movement } from './api'
 import { StatusPill, Stepper } from './components'
 import { formatQty, MOVEMENT_LABEL, newIdempotencyKey, parseQty, productSubtitle, type StockItem } from './domain'
 import { PriceCard } from '@/features/receipts/PriceCard'
@@ -81,7 +81,13 @@ export function StockItemPage() {
           <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.025em]">{item.product_name}</h1>
           {subtitle && <p className="mt-1 text-[14px] text-fg-muted">{subtitle}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-fg-muted">
-            <StatusPill status={item.status} />
+            {item.exclude_from_list ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-[12px] font-medium text-fg-muted">
+                <ListX className="size-3.5" /> Não envia à lista
+              </span>
+            ) : (
+              <StatusPill status={item.status} />
+            )}
             {item.location_name && <span>· {item.location_name}</span>}
             {item.category_name && <span>· {item.category_name}</span>}
           </div>
@@ -124,6 +130,7 @@ export function StockItemPage() {
           </Card>
           <CountCard item={item} onDone={reload} />
           <TransferCard item={item} householdId={household.id} onDone={reload} />
+          <ListExclusionCard item={item} onDone={reload} />
         </>
       )}
 
@@ -293,6 +300,56 @@ function TransferCard({ item, householdId, onDone }: { item: StockItem; househol
           <ArrowRightLeft className="size-3" /> A mudança fica registrada como transferência.
         </p>
       </div>
+    </Card>
+  )
+}
+
+/** "Não envia à lista": para itens comprados de vez em quando que não devem ser repostos (ex.: marmitex). */
+function ListExclusionCard({ item, onDone }: { item: StockItem; onDone: () => Promise<void> }) {
+  const toast = useToast()
+  const [saving, setSaving] = useState(false)
+  const on = item.exclude_from_list
+
+  async function toggle() {
+    setSaving(true)
+    try {
+      const removed = await setListExclusion(item.id, !on)
+      toast.show(
+        !on
+          ? `Marcado: não entra mais sozinho na lista${removed > 0 ? ' (removido da lista atual)' : ''}.`
+          : 'Desmarcado: volta a entrar na lista quando faltar.',
+      )
+      await onDone()
+    } catch (e) {
+      toast.error(toMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="flex items-start justify-between gap-4 p-5">
+      <div className="min-w-0">
+        <p className="text-[14px] font-medium">Não envia à lista</p>
+        <p className="mt-0.5 text-[13px] text-fg-muted">
+          Para o que vocês compram de vez em quando e não precisa repor, como marmitex ou comida pronta. Não entra sozinho na lista
+          (nem pelo estoque, nem pelo histórico) e não aparece como em falta. Ainda dá para adicionar à mão.
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Não envia à lista"
+        disabled={saving}
+        onClick={() => void toggle()}
+        className={clsx(
+          'relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50',
+          on ? 'bg-accent-500' : 'bg-surface-muted ring-1 ring-border',
+        )}
+      >
+        <span className={clsx('absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow transition-transform', on && 'translate-x-5')} />
+      </button>
     </Card>
   )
 }

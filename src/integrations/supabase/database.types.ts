@@ -159,6 +159,7 @@ export type Database = {
           created_at: string
           updated_at: string
           archived_at: string | null
+          exclude_from_list: boolean
         }
         Insert: never
         Update: { ideal_qty?: number; notes?: string | null }
@@ -400,6 +401,7 @@ export type Database = {
           last_movement_at: string | null
           created_at: string
           updated_at: string
+          exclude_from_list: boolean
         }
         Relationships: []
       }
@@ -633,6 +635,7 @@ export type Database = {
         Returns: number
       }
       reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      set_product_list_exclusion: { Args: { p_household_product_id: string; p_exclude: boolean }; Returns: number }
       set_purchase_buyer: { Args: { p_purchase_id: string; p_user_id: string | null }; Returns: undefined }
       intel_filter_options: { Args: { p_household_id: string }; Returns: Json }
       intel_overview: { Args: IntelArgs; Returns: Json }
