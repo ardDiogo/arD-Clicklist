@@ -144,14 +144,14 @@ export function DashboardPage() {
         </Link>
       )}
 
-      <Link to="/financeiro" className="mt-3 block">
+      <Link to="/inteligencia" className="mt-3 block">
         <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
           <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
             <BarChart3 className="size-[18px]" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-medium">Financeiro</p>
-            <p className="text-[12px] text-fg-muted">Gastos do mês, categorias, preços e previsão da próxima compra.</p>
+            <p className="text-[14px] font-medium">Inteligência de compras</p>
+            <p className="text-[12px] text-fg-muted">Gastos, mercados, preços, produtos e onde dá para economizar.</p>
           </div>
           <ChevronRight className="size-4 text-fg-subtle" />
         </Card>

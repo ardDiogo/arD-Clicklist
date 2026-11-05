@@ -2,7 +2,6 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-rou
 import { AppShell } from '@/components/layout/AppShell'
 import { UpdatePrompt } from '@/components/layout/UpdatePrompt'
 import { ToastProvider } from '@/components/ui/Toast'
-import { FinancePage } from '@/features/analytics/FinancePage'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from '@/features/auth/pages'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
@@ -66,7 +65,11 @@ const router = createBrowserRouter([
                   { path: '/lista/:id', element: <ListDetailPage /> },
                   { path: '/compras', element: <PurchasesPage /> },
                   { path: '/compras/:id', element: <ReviewPage /> },
-                  { path: '/financeiro', element: <FinancePage /> },
+                  {
+                    path: '/inteligencia',
+                    lazy: async () => ({ Component: (await import('@/features/intelligence/IntelligencePage')).IntelligencePage }),
+                  },
+                  { path: '/financeiro', element: <Navigate to="/inteligencia" replace /> },
                   { path: '/ajustes', element: <SettingsPage /> },
                 ],
               },

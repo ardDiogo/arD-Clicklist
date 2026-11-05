@@ -91,9 +91,9 @@ export function PurchasesPage() {
         title="Compras"
         description="Comprovantes atualizam o estoque depois da sua revisão."
         action={
-          <Link to="/financeiro">
+          <Link to="/inteligencia">
             <Button size="sm" variant="ghost" icon={<BarChart3 className="size-4" />}>
-              Financeiro
+              Inteligência
             </Button>
           </Link>
         }

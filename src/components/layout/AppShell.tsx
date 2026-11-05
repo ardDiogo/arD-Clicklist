@@ -19,7 +19,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/estoque', label: 'Estoque', icon: Boxes },
   { to: '/lista', label: 'Lista', icon: ListChecks },
   { to: '/compras', label: 'Compras', icon: ReceiptText },
-  { to: '/financeiro', label: 'Financeiro', icon: BarChart3, desktopOnly: true },
+  { to: '/inteligencia', label: 'Inteligência', icon: BarChart3, desktopOnly: true },
   { to: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 

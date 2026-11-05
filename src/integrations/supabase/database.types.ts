@@ -3,6 +3,16 @@
  * Escrito à mão para a Fase 1; quando o projeto Supabase existir, regenere com:
  *   npx supabase gen types typescript --project-id <id> > src/integrations/supabase/database.types.ts
  */
+type IntelArgs = {
+  p_household_id: string
+  p_from: string
+  p_to: string
+  p_store?: string | null
+  p_category?: string | null
+  p_product?: string | null
+  p_brand?: string | null
+}
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type HouseholdRole = 'admin' | 'editor' | 'viewer'
@@ -624,6 +634,24 @@ export type Database = {
       }
       reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
       set_purchase_buyer: { Args: { p_purchase_id: string; p_user_id: string | null }; Returns: undefined }
+      intel_filter_options: { Args: { p_household_id: string }; Returns: Json }
+      intel_overview: { Args: IntelArgs; Returns: Json }
+      intel_stores: { Args: IntelArgs; Returns: Json }
+      intel_products: { Args: IntelArgs; Returns: Json }
+      intel_prices: { Args: IntelArgs; Returns: Json }
+      intel_price_history: {
+        Args: { p_household_id: string; p_household_product_id: string; p_from: string; p_to: string }
+        Returns: {
+          local_date: string
+          store_key: string
+          store_name: string
+          unit: string
+          quantity: number
+          unit_price: number
+          discount: number
+          total_price: number
+        }[]
+      }
       remove_purchase: { Args: { p_purchase_id: string }; Returns: number }
       update_purchase_item_values: {
         Args: { p_item_id: string; p_description: string; p_quantity: number; p_total_price: number }
