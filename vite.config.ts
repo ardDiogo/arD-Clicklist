@@ -14,10 +14,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Casa em Dia',
-        short_name: 'Casa em Dia',
+        name: 'arD ClikList',
+        short_name: 'arD ClikList',
         description: 'Estoque doméstico e lista de compras inteligente.',
         lang: 'pt-BR',
         start_url: '/',

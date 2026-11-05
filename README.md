@@ -1,4 +1,4 @@
-# Casa em Dia *(nome provisório)*
+# arD ClikList
 
 PWA para gestão de estoque doméstico e lista de compras inteligente.
 Princípio central: **o aplicativo trabalha para a família, não a família para o aplicativo.**

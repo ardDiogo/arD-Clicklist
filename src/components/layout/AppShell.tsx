@@ -3,8 +3,7 @@ import { BarChart3, Boxes, House, ListChecks, ReceiptText, Settings, type Lucide
 import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { useHousehold } from '@/features/household/HouseholdProvider'
-import { APP_NAME } from '@/lib/app'
-import { Logo } from './Logo'
+import { Logo, Wordmark } from './Logo'
 import { UpdatePrompt } from './UpdatePrompt'
 
 interface NavItem {
@@ -52,9 +51,9 @@ export function AppShell() {
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5 lg:flex">
         <div className="flex items-center gap-2.5 px-2">
-          <Logo size={26} />
+          <Logo size={30} />
           <div className="min-w-0">
-            <p className="text-[14px] leading-tight font-semibold tracking-[-0.01em]">{APP_NAME}</p>
+            <Wordmark className="block text-[15px] leading-tight" />
             <HouseholdSwitcher />
           </div>
         </div>
@@ -82,7 +81,7 @@ export function AppShell() {
 
       {/* Header — mobile */}
       <header className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-border bg-bg/85 px-5 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 backdrop-blur-xl lg:hidden">
-        <Logo size={24} />
+        <Logo size={26} />
         <div className="min-w-0 flex-1">
           <HouseholdSwitcher />
         </div>
