@@ -84,6 +84,8 @@ const digits = (v: unknown) => (typeof v === 'string' ? v.replace(/\D/g, '') : '
 async function callGemini(apiKey: string, models: string[], body: unknown): Promise<{ text: string; model: string } | { error: string; status: number }> {
   let last: { error: string; status: number } = { error: 'O serviço de IA não respondeu. Tente novamente em instantes.', status: 502 }
   for (const model of models) {
+   // Sobrecarga (503/500) ou limite (429): espera um pouco e tenta de novo; depois passa ao próximo modelo.
+   for (let attempt = 1; attempt <= 2; attempt++) {
     let res: Response
     try {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -113,13 +115,21 @@ async function callGemini(apiKey: string, models: string[], body: unknown): Prom
     // Modelo inexistente/indisponível: tenta o próximo da lista.
     if (res.status === 404 || /not found|not supported for generateContent|is not available/i.test(msg)) {
       last = { error: `Modelo do Gemini indisponível (${model}).`, status: 502 }
+      break
+    }
+    if (res.status === 503 || res.status === 500 || res.status === 429 || /high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED/i.test(msg)) {
+      last = {
+        error: 'O Gemini está sobrecarregado no momento. Aguarde alguns minutos e toque em "Analisar" de novo.',
+        status: 503,
+      }
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 2000))
       continue
     }
     if (/API key not valid|API_KEY_INVALID/i.test(msg)) return { error: 'Chave do Gemini inválida. Confira o secret GEMINI_API_KEY no Supabase.', status: 502 }
     if (res.status === 403) return { error: `A chave do Gemini não tem permissão: ${msg.slice(0, 160)}`, status: 502 }
-    if (res.status === 429) return { error: 'Limite de uso do Gemini atingido. Aguarde alguns minutos e tente de novo.', status: 429 }
     if (/location is not supported/i.test(msg)) return { error: 'O Gemini não está disponível na região do servidor do Supabase.', status: 502 }
     return { error: `O Gemini recusou a análise (${res.status}): ${msg.slice(0, 200) || 'sem detalhes'}`, status: 502 }
+   }
   }
   return last
 }
@@ -134,7 +144,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!apiKey) return json({ error: 'Leitura por foto ainda não configurada (falta GEMINI_API_KEY).' }, 503)
   const models = [
-    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter((m): m is string => !!m)),
+    ...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter((m): m is string => !!m)),
   ]
 
   let fileId: string
