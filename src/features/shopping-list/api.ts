@@ -95,6 +95,11 @@ export async function completeList(listId: string, applyToStock: boolean): Promi
   return rows[0]?.applied_items ?? 0
 }
 
+/** Remove uma lista finalizada do histórico; se ela lançou no estoque, pode estornar. Retorna quantos produtos foram estornados. */
+export async function removeList(listId: string, revertStock: boolean): Promise<number> {
+  return unwrap(await supabase().rpc('remove_shopping_list', { p_list_id: listId, p_revert_stock: revertStock }))
+}
+
 export interface ListSummary extends ShoppingList {
   itemCount: number
   estimatedTotal: number | null

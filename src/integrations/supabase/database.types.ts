@@ -635,6 +635,7 @@ export type Database = {
         Returns: number
       }
       reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      remove_shopping_list: { Args: { p_list_id: string; p_revert_stock?: boolean }; Returns: number }
       set_product_list_exclusion: { Args: { p_household_product_id: string; p_exclude: boolean }; Returns: number }
       set_purchase_buyer: { Args: { p_purchase_id: string; p_user_id: string | null }; Returns: undefined }
       intel_filter_options: { Args: { p_household_id: string }; Returns: Json }
