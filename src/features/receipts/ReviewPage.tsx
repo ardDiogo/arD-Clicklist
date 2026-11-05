@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Trash2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Pencil, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
@@ -23,6 +23,7 @@ import {
   getPurchaseFiles,
   getPurchaseItems,
   signedFileUrl,
+  renamePurchaseStore,
   updatePurchaseItem,
 } from './api'
 import { autoProductName, reviewSummary, SOURCE_LABEL, suggestProducts, titleCase, type Purchase, type PurchaseItem } from './domain'
@@ -51,6 +52,7 @@ export function ReviewPage() {
   const [error, setError] = useState<string | null>(null)
   const [creatingFor, setCreatingFor] = useState<PurchaseItem | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [renaming, setRenaming] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +107,16 @@ export function ReviewPage() {
           <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.025em]">
             {purchase.store_name ?? 'Estabelecimento não identificado'}
           </h1>
+          {can.edit(role) && purchase.status !== 'discarded' && (
+            <button
+              type="button"
+              aria-label="Editar nome do estabelecimento"
+              onClick={() => setRenaming(true)}
+              className="grid size-8 place-items-center rounded-lg text-fg-subtle hover:bg-surface-muted hover:text-fg"
+            >
+              <Pencil className="size-4" />
+            </button>
+          )}
           {purchase.status === 'confirmed' && <Badge tone="accent">Confirmada</Badge>}
           {purchase.status === 'discarded' && <Badge>Descartada</Badge>}
         </div>
@@ -205,6 +217,23 @@ export function ReviewPage() {
             await reloadStock()
             await save(target, { household_product_id: newId, ignored: false })
             toast.show('Produto criado e associado')
+          }}
+        />
+      )}
+
+      {renaming && (
+        <RenameStoreDialog
+          current={purchase.store_name}
+          onClose={() => setRenaming(false)}
+          onSave={async (name, applyAll) => {
+            try {
+              const n = await renamePurchaseStore(purchase.id, name, applyAll)
+              setRenaming(false)
+              toast.show(n > 1 ? `Nome atualizado em ${n} compras` : 'Nome do estabelecimento atualizado')
+              await load()
+            } catch (e) {
+              toast.error(toMessage(e))
+            }
           }}
         />
       )}
@@ -516,5 +545,55 @@ function OriginalFileLink({ path, mime }: { path: string; mime: string }) {
     >
       <FileImage className="size-3.5" /> {mime.startsWith('image/') ? 'Ver foto original' : 'Ver XML original'}
     </button>
+  )
+}
+
+function RenameStoreDialog({
+  current,
+  onClose,
+  onSave,
+}: {
+  current: string | null
+  onClose: () => void
+  onSave: (name: string, applyToSameName: boolean) => Promise<void>
+}) {
+  const [name, setName] = useState(current ?? '')
+  const [applyAll, setApplyAll] = useState(true)
+  const [busy, setBusy] = useState(false)
+  return (
+    <Dialog open onClose={onClose} title="Estabelecimento">
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (!name.trim()) return
+          setBusy(true)
+          try {
+            await onSave(name, applyAll)
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        <TextField label="Nome do supermercado" placeholder="Ex.: Mart Minas Araguari" value={name} maxLength={160} autoFocus onChange={(e) => setName(e.target.value)} />
+        {current && (
+          <label className="flex cursor-pointer items-start gap-3 text-[14px]">
+            <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-accent-600)]" />
+            <span>
+              Aplicar a todas as compras registradas como <strong>“{current}”</strong>
+            </span>
+          </label>
+        )}
+        <p className="text-[12px] text-fg-subtle">Só muda o nome exibido. Valores, itens e estoque não são alterados.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={busy} disabled={!name.trim()}>
+            Salvar
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   )
 }

@@ -212,6 +212,17 @@ export async function updatePurchaseHeader(id: string, storeName: string | null,
   unwrap(await supabase().rpc('update_purchase_header', { p_purchase_id: id, p_store_name: storeName, p_purchased_at: purchasedAt }))
 }
 
+/** Corrige o nome do estabelecimento (também em compras confirmadas). Retorna quantas compras mudaram. */
+export async function renamePurchaseStore(id: string, storeName: string, applyToSameName: boolean): Promise<number> {
+  return unwrap(
+    await supabase().rpc('rename_purchase_store', {
+      p_purchase_id: id,
+      p_store_name: storeName.trim(),
+      p_apply_to_same_name: applyToSameName,
+    }),
+  )
+}
+
 export async function confirmPurchase(id: string): Promise<number> {
   const rows = unwrap(await supabase().rpc('confirm_purchase', { p_purchase_id: id }))
   return rows[0]?.applied_items ?? 0

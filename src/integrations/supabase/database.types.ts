@@ -616,6 +616,10 @@ export type Database = {
         Args: { p_purchase_id: string; p_store_name: string | null; p_purchased_at: string | null }
         Returns: undefined
       }
+      rename_purchase_store: {
+        Args: { p_purchase_id: string; p_store_name: string; p_apply_to_same_name?: boolean }
+        Returns: number
+      }
       confirm_purchase: { Args: { p_purchase_id: string }; Returns: { applied_items: number }[] }
       discard_purchase: { Args: { p_purchase_id: string }; Returns: undefined }
       create_inventory_scan: { Args: { p_household_id: string; p_location_id?: string | null }; Returns: string }
