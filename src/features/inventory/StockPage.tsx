@@ -1,4 +1,4 @@
-import { Boxes, ChevronRight, PackageSearch, Plus, Search, X } from 'lucide-react'
+import { Boxes, Camera, ChevronRight, PackageSearch, Plus, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -54,11 +54,20 @@ export function StockPage() {
   const groups = useMemo(() => groupStock(filterStock(items, query, filter), groupBy), [items, query, filter, groupBy])
 
   const addButton = canEdit ? (
-    <Link to="/estoque/novo">
-      <Button size="sm" icon={<Plus className="size-4" />}>
-        Produto
-      </Button>
-    </Link>
+    <div className="flex gap-2">
+      {items.length > 0 && (
+        <Link to="/inventario" aria-label="Conferir por fotos">
+          <Button size="sm" variant="secondary" icon={<Camera className="size-4" />}>
+            <span className="hidden sm:inline">Conferir</span>
+          </Button>
+        </Link>
+      )}
+      <Link to="/estoque/novo">
+        <Button size="sm" icon={<Plus className="size-4" />}>
+          Produto
+        </Button>
+      </Link>
+    </div>
   ) : null
 
   return (

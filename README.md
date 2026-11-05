@@ -16,8 +16,8 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 | 2 — Produtos e estoque | Categorias, marcas, produtos, ambientes, movimentações | ✅ Implementada |
 | 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ✅ Implementada |
 | 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | ✅ Implementada |
-| 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | ⏳ Próxima |
-| 6 — Financeiro | Histórico de preços, gastos, indicadores | — |
+| 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | ✅ Implementada |
+| 6 — Financeiro | Histórico de preços, gastos, indicadores | ⏳ Próxima |
 
 ### O que a Fase 1 entrega (funcional, não só tela)
 
@@ -89,6 +89,24 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 - **Histórico de preços**: último, média, menor, maior e variação por produto (só compras
   confirmadas, nunca sobrescritas). A lista de compras passa a estimar com o último preço pago.
 
+### O que a Fase 5 entrega
+
+- **Conferência por fotos** (Estoque → Conferir, ou pelo painel): escolha o ambiente, tire ou
+  selecione até 8 fotos; elas vão comprimidas para um bucket privado (`inventory-photos`).
+- **Análise multimodal** (Edge Function `inventory-ai`, Gemini): recebe as fotos e o catálogo da
+  família; devolve produto, marca, detalhes, quantidade (ou vazio se não der para contar),
+  confiança, se está parcialmente escondido e em quais fotos aparece. Produtos indicados
+  pela IA só são aceitos se forem da família.
+- **Revisão humana obrigatória**: só entra pré-confirmado o que é seguro (produto conhecido,
+  contado, confiança ≥ 80% e totalmente visível). O resto fica em "Para revisar", com o motivo.
+  Produtos esperados no ambiente que não apareceram vão para "Não apareceram nas fotos"
+  (Acabou / Está lá / Contei N).
+- **Confirmação**: mostra cada ajuste (antes → depois) e aplica ajustes de inventário numa
+  transação idempotente, com origem `inventory_scan`. Itens pendentes não mudam.
+- **Aprendizado**: o nome usado pela IA vira apelido do produto, para associar sozinho da próxima vez.
+- **Registro**: fotos, data, ambiente, detecções, quantidades estimadas e confirmadas,
+  confiança e responsável ficam salvos.
+
 **Limitações conhecidas**: o leitor da página da SEFAZ cobre o layout padrão (tabela `tabResult`,
 usado por SP, RS/SVRS e vários estados) e foi testado com um exemplo desse layout, não contra os
 portais reais. Se o seu estado usar outro layout, o app avisa e sugere foto ou XML.
@@ -109,6 +127,7 @@ src/
     inventory/         # Estoque: domínio (regras puras), API, hooks realtime, telas
     shopping-list/     # Lista de compras: domínio, API, hooks realtime, telas, histórico
     receipts/          # Comprovantes: parsers fiscais (QR/HTML/XML), importação, revisão, preços
+    inventory-scan/    # Inventário por fotos: envio, análise, revisão por confiança, ajustes
     settings/          # Família, membros/convites, ambientes, aparência, conta
     dashboard/
     placeholder/       # Telas "Chega na Fase X"
@@ -118,7 +137,7 @@ src/
 supabase/
   migrations/          # SQL versionado (fonte da verdade do banco)
   tests/               # Testes SQL de RLS/regras + stub mínimo do Supabase
-  functions/           # Edge Functions: nfce-proxy (SEFAZ) e receipt-ai (Gemini)
+  functions/           # Edge Functions: nfce-proxy (SEFAZ), receipt-ai e inventory-ai (Gemini)
 scripts/test-db.sh     # Sobe Postgres temporário e roda os testes SQL
 ```
 
@@ -164,7 +183,8 @@ npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque,
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
 2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
    (`20261105000100_foundation.sql`, `20261106000100_catalog_stock.sql`, `20261107000100_shopping_lists.sql`,
-   `20261108000100_purchases.sql`). A da Fase 4 também cria o bucket privado `receipts`.
+   `20261108000100_purchases.sql`, `20261109000100_inventory_scans.sql`). As das Fases 4 e 5 também
+   criam os buckets privados `receipts` e `inventory-photos`.
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
    - *Site URL*: a URL da Vercel (ex.: `https://seu-app.vercel.app`).
@@ -186,6 +206,7 @@ Pelo painel (sem instalar nada): **Edge Functions → Deploy a new function → 
 | --- | --- | --- |
 | `nfce-proxy` | `supabase/functions/nfce-proxy/index.ts` | nada |
 | `receipt-ai` | `supabase/functions/receipt-ai/index.ts` | secret `GEMINI_API_KEY` |
+| `inventory-ai` | `supabase/functions/inventory-ai/index.ts` | secret `GEMINI_API_KEY` |
 
 Use exatamente esses nomes e mantenha "Verify JWT" ligado. A chave do Gemini é gratuita em
 <https://aistudio.google.com/apikey> e vai em **Edge Functions → Secrets** (nunca em `VITE_*`).

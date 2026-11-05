@@ -1,4 +1,4 @@
-import { Camera, ChevronRight, ListChecks, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
+import { BarChart3, Camera, ChevronRight, ListChecks, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
@@ -26,7 +26,7 @@ interface Module {
 }
 
 const NEXT_MODULES: Module[] = [
-  { icon: Camera, title: 'Inventário por fotos', description: 'Fotografe os armários para conferir o estoque.', phase: 5 },
+  { icon: BarChart3, title: 'Painel financeiro', description: 'Gastos por mês e categoria, evolução de preços e previsão.', phase: 6 },
 ]
 
 export function DashboardPage() {
@@ -133,6 +133,21 @@ export function DashboardPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-medium">Registrar compra</p>
               <p className="text-[12px] text-fg-muted">QR Code, foto ou XML do cupom fiscal.</p>
+            </div>
+            <ChevronRight className="size-4 text-fg-subtle" />
+          </Card>
+        </Link>
+      )}
+
+      {can.edit(role) && items.length > 0 && (
+        <Link to="/inventario" className="mt-3 block">
+          <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+            <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+              <Camera className="size-[18px]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-medium">Conferir por fotos</p>
+              <p className="text-[12px] text-fg-muted">Fotografe a despensa e confirme o que a IA encontrou.</p>
             </div>
             <ChevronRight className="size-4 text-fg-subtle" />
           </Card>

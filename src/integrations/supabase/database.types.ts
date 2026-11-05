@@ -14,6 +14,9 @@ export type ShoppingListStatus = 'open' | 'completed' | 'cancelled'
 export type ShoppingItemOrigin = 'manual' | 'stock' | 'suggestion'
 export type PurchaseStatus = 'draft' | 'confirmed' | 'discarded'
 export type PurchaseSource = 'nfce_qrcode' | 'xml' | 'photo' | 'manual'
+export type InventoryScanStatus = 'draft' | 'confirmed' | 'discarded'
+export type InventoryItemOrigin = 'detected' | 'expected'
+export type InventoryItemStatus = 'pending' | 'confirmed' | 'ignored'
 
 export type Database = {
   public: {
@@ -282,6 +285,66 @@ export type Database = {
         Update: never
         Relationships: []
       }
+      inventory_scans: {
+        Row: {
+          id: string
+          household_id: string
+          location_id: string | null
+          status: InventoryScanStatus
+          model: string | null
+          analyzed_at: string | null
+          notes: string | null
+          created_by: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      inventory_scan_files: {
+        Row: {
+          id: string
+          scan_id: string
+          household_id: string
+          position: number
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          sha256: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      inventory_scan_items: {
+        Row: {
+          id: string
+          scan_id: string
+          household_id: string
+          origin: InventoryItemOrigin
+          household_product_id: string | null
+          detected_name: string | null
+          detected_brand: string | null
+          detected_details: string | null
+          estimated_quantity: number | null
+          confidence: number | null
+          partially_hidden: boolean
+          photo_positions: number[]
+          system_quantity: number | null
+          confirmed_quantity: number | null
+          status: InventoryItemStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       audit_log: {
         Row: {
           id: number
@@ -486,6 +549,23 @@ export type Database = {
       }
       confirm_purchase: { Args: { p_purchase_id: string }; Returns: { applied_items: number }[] }
       discard_purchase: { Args: { p_purchase_id: string }; Returns: undefined }
+      create_inventory_scan: { Args: { p_household_id: string; p_location_id?: string | null }; Returns: string }
+      register_inventory_photo: {
+        Args: { p_scan_id: string; p_position: number; p_storage_path: string; p_mime_type: string; p_size_bytes: number; p_sha256: string }
+        Returns: string
+      }
+      save_inventory_detections: { Args: { p_scan_id: string; p_detections: Json; p_model?: string | null }; Returns: number }
+      update_inventory_item: {
+        Args: {
+          p_item_id: string
+          p_household_product_id: string | null
+          p_confirmed_quantity: number | null
+          p_status: InventoryItemStatus
+        }
+        Returns: undefined
+      }
+      confirm_inventory_scan: { Args: { p_scan_id: string }; Returns: { adjusted_items: number }[] }
+      discard_inventory_scan: { Args: { p_scan_id: string }; Returns: undefined }
       remove_household_member: {
         Args: { p_household_id: string; p_user_id: string }
         Returns: undefined
@@ -500,6 +580,9 @@ export type Database = {
       shopping_item_origin: ShoppingItemOrigin
       purchase_status: PurchaseStatus
       purchase_source: PurchaseSource
+      inventory_scan_status: InventoryScanStatus
+      inventory_item_origin: InventoryItemOrigin
+      inventory_item_status: InventoryItemStatus
     }
     CompositeTypes: { [_ in never]: never }
   }

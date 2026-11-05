@@ -9,6 +9,8 @@ import { AcceptInvitePage, CreateHouseholdPage } from '@/features/household/page
 import { ProductFormPage } from '@/features/inventory/ProductFormPage'
 import { StockItemPage } from '@/features/inventory/StockItemPage'
 import { StockPage } from '@/features/inventory/StockPage'
+import { ScanReviewPage } from '@/features/inventory-scan/ScanReviewPage'
+import { ScansPage } from '@/features/inventory-scan/ScansPage'
 import { PurchasesPage } from '@/features/receipts/PurchasesPage'
 import { ReviewPage } from '@/features/receipts/ReviewPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
                   { path: '/estoque/novo', element: <ProductFormPage /> },
                   { path: '/estoque/:id', element: <StockItemPage /> },
                   { path: '/estoque/:id/editar', element: <ProductFormPage /> },
+                  { path: '/inventario', element: <ScansPage /> },
+                  { path: '/inventario/:id', element: <ScanReviewPage /> },
                   { path: '/lista', element: <ShoppingListPage /> },
                   { path: '/lista/historico', element: <ListHistoryPage /> },
                   { path: '/lista/:id', element: <ListDetailPage /> },
