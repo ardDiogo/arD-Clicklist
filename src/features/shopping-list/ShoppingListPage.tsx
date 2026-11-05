@@ -1,4 +1,4 @@
-import { CalendarClock, Camera, History, ListChecks, RefreshCw, RotateCcw, ShoppingCart, Sparkles } from 'lucide-react'
+import { Boxes, CalendarClock, Camera, History, ListChecks, RefreshCw, RotateCcw, ShoppingCart, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -156,6 +156,8 @@ export function ShoppingListPage() {
 
           {canEdit && (
             <BuildListCard
+              syncing={syncing}
+              onStock={() => void sync()}
               suggesting={suggesting}
               onSuggest={() => setSuggestOpen(true)}
               onPhotos={() => navigate('/inventario?voltar=lista')}
@@ -187,7 +189,7 @@ export function ShoppingListPage() {
               <EmptyState
                 icon={ShoppingCart}
                 title="Nada para comprar"
-                description="O estoque está em dia. Itens que acabarem aparecem aqui automaticamente — ou use a sugestão pelo consumo dos últimos meses."
+                description="A lista está vazia. Monte por um dos três jeitos acima: pelo estoque, pela média das compras ou pelas fotos do armário."
               />
             </Card>
           ) : (
@@ -226,13 +228,6 @@ export function ShoppingListPage() {
             </>
           )}
 
-          {canEdit && missing.length === 0 && items.length > 0 && (
-            <div className="flex justify-center">
-              <Button size="sm" variant="ghost" loading={syncing} icon={<RefreshCw className="size-3.5" />} onClick={() => void sync()}>
-                Atualizar pelo estoque
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -398,16 +393,22 @@ function FinishDialog({
 
 /** As duas formas de montar a lista: pelo histórico de compras ou conferindo a despensa por fotos. */
 function BuildListCard({
+  syncing,
+  onStock,
   suggesting,
   onSuggest,
   onPhotos,
   onReset,
 }: {
+  syncing: boolean
+  onStock: () => void
   suggesting: boolean
   onSuggest: () => void
   onPhotos: () => void
   onReset?: () => void
 }) {
+  const iconBox =
+    'grid size-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100'
   const option =
     'flex min-w-0 items-start gap-3 rounded-xl border border-border bg-surface p-3.5 text-left shadow-card transition-[background-color,transform] hover:bg-surface-muted/60 active:scale-[0.99] disabled:opacity-60'
   return (
@@ -424,27 +425,32 @@ function BuildListCard({
           </button>
         )}
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-2">
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <button type="button" className={option} onClick={onStock} disabled={syncing}>
+          <span className={iconBox}>
+            {syncing ? <RefreshCw className="size-[18px] animate-spin" /> : <Boxes className="size-[18px]" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-medium">Pelo estoque</span>
+            <span className="block text-[12px] leading-4 text-fg-muted">O que está abaixo do ideal em casa entra na lista.</span>
+          </span>
+        </button>
         <button type="button" className={option} onClick={onSuggest} disabled={suggesting}>
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100">
+          <span className={iconBox}>
             {suggesting ? <RefreshCw className="size-[18px] animate-spin" /> : <CalendarClock className="size-[18px]" />}
           </span>
           <span className="min-w-0">
             <span className="block text-[14px] font-medium">Pela média das compras</span>
-            <span className="block text-[12px] leading-4 text-fg-muted">
-              O que vocês compram por mês, em média, nos últimos meses.
-            </span>
+            <span className="block text-[12px] leading-4 text-fg-muted">O que vocês compram por mês, em média, nos últimos meses.</span>
           </span>
         </button>
         <button type="button" className={option} onClick={onPhotos}>
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+          <span className={iconBox}>
             <Camera className="size-[18px]" />
           </span>
           <span className="min-w-0">
-            <span className="block text-[14px] font-medium">Pelas fotos da despensa</span>
-            <span className="block text-[12px] leading-4 text-fg-muted">
-              Fotografe os armários, confirme o que há em casa e a lista mostra o que falta.
-            </span>
+            <span className="block text-[14px] font-medium">Pelas fotos do armário</span>
+            <span className="block text-[12px] leading-4 text-fg-muted">Fotografe os armários, confirme o que há em casa e veja o que falta.</span>
           </span>
         </button>
       </div>
