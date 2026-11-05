@@ -11,7 +11,7 @@ export function SetupRequired() {
         <li>Crie um projeto em supabase.com e aplique as migrations de <code>supabase/migrations</code>.</li>
         <li>
           Copie <code>.env.example</code> para <code>.env.local</code> e preencha{' '}
-          <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code>.
+          <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>.
         </li>
         <li>Reinicie o servidor de desenvolvimento.</li>
       </ol>

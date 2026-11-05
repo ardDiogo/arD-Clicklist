@@ -116,7 +116,8 @@ npm run test:db   # Postgres local: migrations + RLS, isolamento entre famílias
 ### 2. Vercel
 1. Importe o repositório; o preset Vite é detectado (`vercel.json` já cuida do
    fallback de SPA e cabeçalhos de segurança).
-2. Em *Environment Variables*, defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+2. Em *Environment Variables*, defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
+   (o nome antigo `VITE_SUPABASE_ANON_KEY` também é aceito).
 
 ### 3. IA (somente a partir da Fase 4)
 Chave do Gemini como secret das Edge Functions (`npx supabase secrets set GEMINI_API_KEY=...`).
