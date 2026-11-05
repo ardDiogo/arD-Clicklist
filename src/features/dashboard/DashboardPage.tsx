@@ -74,6 +74,19 @@ export function DashboardPage() {
         </Link>
       )}
 
+      <Link to="/churrasco" className="mt-3 block">
+        <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+          <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+            <Flame className="size-[18px]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium">Churrascômetro</p>
+            <p className="text-[12px] text-fg-muted">Quanto comprar de carne, bebida e carvão — e mande direto para a lista.</p>
+          </div>
+          <ChevronRight className="size-4 text-fg-subtle" />
+        </Card>
+      </Link>
+
       {restock.length > 0 && (
         <section className="mt-6">
           <div className="mb-2 flex items-baseline justify-between px-1">
@@ -157,18 +170,6 @@ export function DashboardPage() {
         </Card>
       </Link>
 
-      <Link to="/churrasco" className="mt-3 block">
-        <Card className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
-          <div className="grid size-9 place-items-center rounded-lg bg-surface-muted text-fg-muted">
-            <Flame className="size-[18px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-medium">Churrascômetro</p>
-            <p className="text-[12px] text-fg-muted">Quanto comprar de carne, bebida e carvão — e mande direto para a lista.</p>
-          </div>
-          <ChevronRight className="size-4 text-fg-subtle" />
-        </Card>
-      </Link>
     </>
   )
 }
