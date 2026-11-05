@@ -1,8 +1,12 @@
 -- Simula o mínimo do ambiente Supabase para rodar as migrations em um
 -- PostgreSQL comum (somente para testes locais; NÃO é uma migration).
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin bypassrls;
+-- Papéis são globais no cluster: cria só se ainda não existirem.
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
+end $$;
 
 create schema auth;
 create schema extensions;

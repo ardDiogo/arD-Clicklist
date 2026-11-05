@@ -27,16 +27,18 @@ import type { HouseholdRole } from '@/integrations/supabase/database.types'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatDate } from '@/lib/format'
+import { LocationsCard } from './LocationsCard'
 
 const ROLES: HouseholdRole[] = ['admin', 'editor', 'viewer']
 
 export function SettingsPage() {
   return (
     <>
-      <PageHeader title="Ajustes" description="Família, membros e preferências." />
+      <PageHeader title="Ajustes" description="Família, membros, ambientes e preferências." />
       <div className="space-y-5">
         <HouseholdCard />
         <MembersCard />
+        <LocationsCard />
         <PreferencesCard />
         <AccountCard />
       </div>

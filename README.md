@@ -13,8 +13,8 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 | Fase | Escopo | Status |
 | --- | --- | --- |
 | 1 — Fundação | Projeto, PWA, Auth, família, convites, papéis, RLS | ✅ Implementada |
-| 2 — Produtos e estoque | Categorias, marcas, produtos, ambientes, movimentações | ⏳ Próxima |
-| 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | — |
+| 2 — Produtos e estoque | Categorias, marcas, produtos, ambientes, movimentações | ✅ Implementada |
+| 3 — Lista inteligente | Geração automática, manual, tempo real, estimativas | ⏳ Próxima |
 | 4 — Comprovantes | QR Code NFC-e → XML → foto/IA, revisão, confirmação transacional | — |
 | 5 — Inventário por fotos | Captura, reconhecimento multimodal, revisão, ajuste | — |
 | 6 — Financeiro | Histórico de preços, gastos, indicadores | — |
@@ -36,7 +36,24 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 - **UI**: pt-BR, mobile-first (tab bar no celular, sidebar no desktop), tema claro
   por padrão + escuro/sistema.
 
-Telas de Estoque, Lista e Compras aparecem como "Chega na Fase X": nada nelas é simulado.
+### O que a Fase 2 entrega
+
+- **Catálogo**: 9 categorias padrão (globais), marcas criadas automaticamente pelo nome
+  (sem duplicar por maiúsculas), produtos com marca, apresentação, embalagem, unidade e
+  código de barras (único por família).
+- **Ambientes**: 8 ambientes padrão criados para cada família (inclusive as já existentes);
+  a família pode adicionar, renomear e remover em *Ajustes*.
+- **Estoque** (em embalagens): ideal, atual, **comprar = máx(0, ideal − atual)**, status
+  (em dia / repor / sem estoque), agrupado por ambiente ou categoria, busca sem acento,
+  filtros, ações rápidas −1/+1 com *Desfazer*, contagem, "acabou", transferência entre
+  ambientes, histórico e remoção (soft delete, histórico preservado). Tempo real entre membros.
+- **Integridade**: `current_qty` só muda por `stock_movements`, gravada em função transacional
+  que trava a linha (`SELECT … FOR UPDATE`); sem estoque negativo; movimentações imutáveis
+  (bloqueadas até para o dono das tabelas); idempotência por chave; referências validadas
+  para a mesma família; leitores (viewer) só leem.
+- **Painel**: números reais (produtos, para repor, em falta) e lista do que precisa repor.
+
+Telas de Lista e Compras aparecem como "Chega na Fase X": nada nelas é simulado.
 
 ---
 
@@ -51,7 +68,8 @@ src/
   features/
     auth/              # AuthProvider, páginas, redirect seguro
     household/         # API (RPCs), HouseholdProvider, onboarding, convite, papéis
-    settings/          # Família, membros/convites, aparência, conta
+    inventory/         # Estoque: domínio (regras puras), API, hooks realtime, telas
+    settings/          # Família, membros/convites, ambientes, aparência, conta
     dashboard/
     placeholder/       # Telas "Chega na Fase X"
   hooks/               # useTheme
@@ -89,11 +107,11 @@ Sem `.env.local`, o app abre uma tela explicando o que configurar.
 ### Testes
 
 ```bash
-npm test          # Vitest: formatação, erros, redirect seguro, permissões
+npm test          # Vitest: regras de estoque, formatação, erros, redirect seguro, permissões
 ```
 
 ```bash
-npm run test:db   # Postgres local: migrations + RLS, isolamento entre famílias, convites, papéis
+npm run test:db   # Postgres local: RLS, isolamento, convites, papéis, estoque, idempotência
 ```
 
 `test:db` precisa dos binários do PostgreSQL (`initdb`, `pg_ctl`, `psql`) instalados.
@@ -104,13 +122,14 @@ npm run test:db   # Postgres local: migrations + RLS, isolamento entre famílias
 
 ### 1. Supabase
 1. Crie um projeto em <https://supabase.com> (plano gratuito).
-2. Aplique a migration: **SQL Editor** → cole `supabase/migrations/20261105000100_foundation.sql` → Run.
+2. Aplique as migrations **em ordem**: **SQL Editor** → cole cada arquivo de `supabase/migrations/` → Run
+   (`20261105000100_foundation.sql`, depois `20261106000100_catalog_stock.sql`).
    (ou com a CLI: `npx supabase link --project-ref <ref>` e `npx supabase db push`).
 3. **Authentication → URL Configuration**:
    - *Site URL*: a URL da Vercel (ex.: `https://seu-app.vercel.app`).
    - *Redirect URLs*: `http://localhost:5173/**` e `https://seu-app.vercel.app/**`.
-4. **Database → Publications**: confirme que `supabase_realtime` existe (a migration
-   adiciona `household_members` a ela automaticamente).
+4. **Database → Publications**: confirme que `supabase_realtime` existe (as migrations
+   adicionam as tabelas necessárias automaticamente).
 5. Copie *Project URL* e a chave *anon/publishable* para `.env.local`.
 
 ### 2. Vercel

@@ -1,10 +1,15 @@
-import { Boxes, Camera, ListChecks, ReceiptText, type LucideIcon } from 'lucide-react'
+import { Camera, ChevronRight, ListChecks, Plus, ReceiptText, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
+import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/feedback'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
+import { can } from '@/features/household/roles'
+import { StatusDot } from '@/features/inventory/components'
+import { formatQty, productSubtitle } from '@/features/inventory/domain'
+import { useStock } from '@/features/inventory/hooks'
 
 function greeting(date = new Date()): string {
   const h = date.getHours()
@@ -20,12 +25,7 @@ interface Module {
   phase: number
 }
 
-/**
- * Nesta fase ainda não existem produtos/estoque no banco, então o painel não
- * mostra números — apenas o que vem a seguir. Nenhum dado fictício é exibido.
- */
-const MODULES: Module[] = [
-  { icon: Boxes, title: 'Produtos e estoque', description: 'Cadastre o que sua casa usa e quanto quer manter.', phase: 2 },
+const NEXT_MODULES: Module[] = [
   { icon: ListChecks, title: 'Lista automática', description: 'Gerada pela diferença entre o ideal e o que há em casa.', phase: 3 },
   { icon: ReceiptText, title: 'Comprovantes', description: 'QR Code da NFC-e atualiza o estoque após sua confirmação.', phase: 4 },
   { icon: Camera, title: 'Inventário por fotos', description: 'Fotografe os armários para conferir o estoque.', phase: 5 },
@@ -33,27 +33,87 @@ const MODULES: Module[] = [
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const { household } = useCurrentHousehold()
+  const { household, role } = useCurrentHousehold()
+  const { data } = useStock(household.id)
   const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0]
+
+  const items = data ?? []
+  const restock = items
+    .filter((i) => i.to_buy_qty > 0)
+    .sort((a, b) => (a.status === 'out' ? 0 : 1) - (b.status === 'out' ? 0 : 1) || b.to_buy_qty - a.to_buy_qty)
+  const out = items.filter((i) => i.status === 'out').length
+  const totalUnitsToBuy = restock.reduce((sum, i) => sum + i.to_buy_qty, 0)
 
   return (
     <>
       <PageHeader title={`${greeting()}${firstName ? `, ${firstName}` : ''}`} description={household.name} />
 
-      <Card className="p-5 animate-fade-in">
-        <p className="text-[14px] font-medium">Sua família está pronta.</p>
-        <p className="mt-1 text-[13px] leading-5 text-fg-muted">
-          Convide quem divide as compras com você em{' '}
-          <Link to="/ajustes" className="font-medium text-fg underline-offset-4 hover:underline">
-            Ajustes
-          </Link>
-          . Os próximos módulos aparecem aqui conforme forem liberados.
-        </p>
-      </Card>
+      {/* Números reais do estoque — sem dados fictícios */}
+      <div className="grid grid-cols-3 gap-3 animate-fade-in">
+        <Stat label="Produtos" value={data ? String(items.length) : '—'} to="/estoque" />
+        <Stat label="Para repor" value={data ? String(restock.length) : '—'} tone={restock.length ? 'warn' : undefined} to="/estoque" />
+        <Stat label="Em falta" value={data ? String(out) : '—'} tone={out ? 'danger' : undefined} to="/estoque" />
+      </div>
 
-      <h2 className="mt-8 mb-3 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Em construção</h2>
+      {data && items.length === 0 && (
+        <Card className="mt-5 p-5">
+          <p className="text-[15px] font-medium">Comece pelo estoque</p>
+          <p className="mt-1 text-[13px] leading-5 text-fg-muted">
+            Cadastre os produtos que sua casa costuma ter e quanto quer manter de cada um. O app passa a saber o que falta.
+          </p>
+          {can.edit(role) && (
+            <Link to="/estoque/novo" className="mt-4 inline-block">
+              <Button size="sm" icon={<Plus className="size-4" />}>
+                Cadastrar primeiro produto
+              </Button>
+            </Link>
+          )}
+        </Card>
+      )}
+
+      {restock.length > 0 && (
+        <section className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between px-1">
+            <h2 className="text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Precisa repor</h2>
+            <span className="text-[12px] text-fg-subtle">{formatQty(totalUnitsToBuy)} embalagens no total</span>
+          </div>
+          <Card className="overflow-hidden">
+            <ul className="divide-y divide-border">
+              {restock.slice(0, 6).map((i) => {
+                const subtitle = productSubtitle(i)
+                return (
+                  <li key={i.id}>
+                    <Link to={`/estoque/${i.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-muted/60">
+                      <StatusDot status={i.status} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[14px] font-medium">{i.product_name}</p>
+                        {subtitle && <p className="truncate text-[12px] text-fg-muted">{subtitle}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[13px] font-semibold text-accent-600 tabular-nums dark:text-accent-500">
+                          +{formatQty(i.to_buy_qty)}
+                        </p>
+                        <p className="text-[11px] text-fg-subtle tabular-nums">
+                          {formatQty(i.current_qty)} de {formatQty(i.ideal_qty)}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+            {restock.length > 6 && (
+              <Link to="/estoque" className="flex items-center justify-center gap-1 border-t border-border py-2.5 text-[13px] text-fg-muted hover:text-fg">
+                Ver todos ({restock.length}) <ChevronRight className="size-3.5" />
+              </Link>
+            )}
+          </Card>
+        </section>
+      )}
+
+      <h2 className="mt-8 mb-3 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Em construção</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {MODULES.map(({ icon: Icon, title, description, phase }) => (
+        {NEXT_MODULES.map(({ icon: Icon, title, description, phase }) => (
           <Card key={title} className="flex gap-3 p-4">
             <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-muted text-fg-muted">
               <Icon className="size-[18px]" strokeWidth={1.75} />
@@ -71,3 +131,22 @@ export function DashboardPage() {
     </>
   )
 }
+
+function Stat({ label, value, tone, to }: { label: string; value: string; tone?: 'warn' | 'danger'; to: string }) {
+  return (
+    <Link to={to}>
+      <Card className="px-4 py-3.5 transition-colors hover:bg-surface-muted/50">
+        <p className="text-[12px] text-fg-muted">{label}</p>
+        <p
+          className={
+            'mt-1 text-[24px] leading-none font-semibold tabular-nums ' +
+            (tone === 'danger' ? 'text-danger' : tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-fg')
+          }
+        >
+          {value}
+        </p>
+      </Card>
+    </Link>
+  )
+}
+

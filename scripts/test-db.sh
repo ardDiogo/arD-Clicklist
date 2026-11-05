@@ -31,10 +31,10 @@ PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -X -q -v ON_ERROR_STOP=1)
 
 run_suite() {
   local test_file="$1"
-  "${PSQL[@]}" -d postgres -c "drop database if exists t" -c "create database t" >/dev/null 2>&1
-  "${PSQL[@]}" -d t -f "$ROOT/supabase/tests/_supabase_stub.sql" >/dev/null
+  "${PSQL[@]}" -d postgres -c "drop database if exists t" -c "create database t" >/dev/null 2>&1 || return 1
+  "${PSQL[@]}" -d t -f "$ROOT/supabase/tests/_supabase_stub.sql" >/dev/null || return 1
   for m in "$ROOT"/supabase/migrations/*.sql; do
-    "${PSQL[@]}" -d t -f "$m" >/dev/null
+    "${PSQL[@]}" -d t -f "$m" >/dev/null || { echo "✗ migration falhou: $(basename "$m")"; return 1; }
   done
   echo "▶ $(basename "$test_file")"
   "${PSQL[@]}" -d t -o /dev/null -f "$test_file" 2>&1 | sed -e 's/^psql:.*NOTICE:  /  /'

@@ -1,11 +1,15 @@
-import { Boxes, ListChecks, ReceiptText } from 'lucide-react'
+import { ListChecks, ReceiptText } from 'lucide-react'
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
+import { ToastProvider } from '@/components/ui/Toast'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from '@/features/auth/pages'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { HouseholdProvider } from '@/features/household/HouseholdProvider'
 import { AcceptInvitePage, CreateHouseholdPage } from '@/features/household/pages'
+import { ProductFormPage } from '@/features/inventory/ProductFormPage'
+import { StockItemPage } from '@/features/inventory/StockItemPage'
+import { StockPage } from '@/features/inventory/StockPage'
 import { ComingSoonPage } from '@/features/placeholder/ComingSoonPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { useTheme } from '@/hooks/useTheme'
@@ -17,7 +21,9 @@ function Providers() {
   return (
     <AuthProvider>
       <HouseholdProvider>
-        <Outlet />
+        <ToastProvider>
+          <Outlet />
+        </ToastProvider>
       </HouseholdProvider>
     </AuthProvider>
   )
@@ -43,17 +49,10 @@ const router = createBrowserRouter([
                 element: <AppShell />,
                 children: [
                   { index: true, element: <DashboardPage /> },
-                  {
-                    path: '/estoque',
-                    element: (
-                      <ComingSoonPage
-                        title="Estoque"
-                        icon={Boxes}
-                        phase={2}
-                        description="Produtos por ambiente e categoria, com quantidade ideal, atual e histórico de movimentações."
-                      />
-                    ),
-                  },
+                  { path: '/estoque', element: <StockPage /> },
+                  { path: '/estoque/novo', element: <ProductFormPage /> },
+                  { path: '/estoque/:id', element: <StockItemPage /> },
+                  { path: '/estoque/:id/editar', element: <ProductFormPage /> },
                   {
                     path: '/lista',
                     element: (

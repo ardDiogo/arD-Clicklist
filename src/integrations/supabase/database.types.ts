@@ -6,6 +6,10 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type HouseholdRole = 'admin' | 'editor' | 'viewer'
+export type MeasureUnit = 'un' | 'g' | 'kg' | 'ml' | 'l'
+export type StockMovementType = 'purchase' | 'consumption' | 'inventory_adjustment' | 'correction' | 'transfer'
+export type StockMovementSource = 'manual' | 'purchase' | 'inventory_scan' | 'system'
+export type StockStatus = 'untracked' | 'out' | 'low' | 'ok'
 
 export type Database = {
   public: {
@@ -67,6 +71,104 @@ export type Database = {
         Update: never
         Relationships: []
       }
+      categories: {
+        Row: {
+          id: string
+          household_id: string | null
+          name: string
+          icon: string | null
+          sort_order: number
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: { household_id: string; name: string; icon?: string | null; sort_order?: number }
+        Update: { name?: string; icon?: string | null; sort_order?: number; archived_at?: string | null }
+        Relationships: []
+      }
+      brands: {
+        Row: { id: string; household_id: string | null; name: string; created_at: string; updated_at: string }
+        Insert: { household_id: string; name: string }
+        Update: { name?: string }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          id: string
+          household_id: string | null
+          name: string
+          brand_id: string | null
+          category_id: string | null
+          barcode: string | null
+          presentation: string | null
+          package_size: number | null
+          unit: MeasureUnit
+          description: string | null
+          image_path: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      locations: {
+        Row: {
+          id: string
+          household_id: string
+          name: string
+          sort_order: number
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: { household_id: string; name: string; sort_order?: number }
+        Update: { name?: string; sort_order?: number }
+        Relationships: []
+      }
+      household_products: {
+        Row: {
+          id: string
+          household_id: string
+          product_id: string
+          location_id: string | null
+          ideal_qty: number
+          current_qty: number
+          notes: string | null
+          last_movement_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: never
+        Update: { ideal_qty?: number; notes?: string | null }
+        Relationships: []
+      }
+      stock_movements: {
+        Row: {
+          id: string
+          household_id: string
+          household_product_id: string
+          type: StockMovementType
+          source: StockMovementSource
+          source_id: string | null
+          quantity_delta: number
+          quantity_before: number
+          quantity_after: number
+          from_location_id: string | null
+          to_location_id: string | null
+          note: string | null
+          idempotency_key: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       audit_log: {
         Row: {
           id: number
@@ -83,7 +185,37 @@ export type Database = {
         Relationships: []
       }
     }
-    Views: { [_ in never]: never }
+    Views: {
+      household_stock: {
+        Row: {
+          id: string
+          household_id: string
+          product_id: string
+          product_name: string
+          presentation: string | null
+          package_size: number | null
+          unit: MeasureUnit
+          barcode: string | null
+          brand_id: string | null
+          brand_name: string | null
+          category_id: string | null
+          category_name: string | null
+          category_sort: number | null
+          location_id: string | null
+          location_name: string | null
+          location_sort: number | null
+          ideal_qty: number
+          current_qty: number
+          to_buy_qty: number
+          status: StockStatus
+          notes: string | null
+          last_movement_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Relationships: []
+      }
+    }
     Functions: {
       create_household: { Args: { p_name: string }; Returns: string }
       rename_household: { Args: { p_household_id: string; p_name: string }; Returns: undefined }
@@ -101,17 +233,63 @@ export type Database = {
         Args: { p_household_id: string; p_user_id: string; p_role: HouseholdRole }
         Returns: undefined
       }
+      create_tracked_product: {
+        Args: TrackedProductArgs & {
+          p_household_id: string
+          p_location_id?: string | null
+          p_current_qty?: number
+        }
+        Returns: string
+      }
+      update_tracked_product: {
+        Args: TrackedProductArgs & { p_household_product_id: string }
+        Returns: undefined
+      }
+      record_stock_movement: {
+        Args: {
+          p_household_product_id: string
+          p_type: StockMovementType
+          p_quantity: number
+          p_note?: string | null
+          p_idempotency_key?: string | null
+        }
+        Returns: string
+      }
+      transfer_household_product: {
+        Args: { p_household_product_id: string; p_to_location_id: string; p_note?: string | null }
+        Returns: string
+      }
+      archive_household_product: { Args: { p_household_product_id: string }; Returns: undefined }
+      archive_location: { Args: { p_location_id: string }; Returns: undefined }
       remove_household_member: {
         Args: { p_household_id: string; p_user_id: string }
         Returns: undefined
       }
     }
-    Enums: { household_role: HouseholdRole }
+    Enums: {
+      household_role: HouseholdRole
+      measure_unit: MeasureUnit
+      stock_movement_type: StockMovementType
+      stock_movement_source: StockMovementSource
+    }
     CompositeTypes: { [_ in never]: never }
   }
+}
+
+type TrackedProductArgs = {
+  p_name: string
+  p_brand_name?: string | null
+  p_category_id?: string | null
+  p_presentation?: string | null
+  p_package_size?: number | null
+  p_unit?: MeasureUnit
+  p_barcode?: string | null
+  p_ideal_qty?: number
+  p_notes?: string | null
 }
 
 export type InviteStatus = 'valid' | 'expired' | 'revoked' | 'accepted'
 
 type PublicTables = Database['public']['Tables']
 export type Tables<T extends keyof PublicTables> = PublicTables[T]['Row']
+export type Views<T extends keyof Database['public']['Views']> = Database['public']['Views'][T]['Row']
