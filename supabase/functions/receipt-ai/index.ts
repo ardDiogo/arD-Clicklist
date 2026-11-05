@@ -80,57 +80,102 @@ function toBase64(bytes: Uint8Array): string {
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const digits = (v: unknown) => (typeof v === 'string' ? v.replace(/\D/g, '') : '')
 
-// Chama o Gemini tentando modelos alternativos se o configurado não existir mais.
-// Devolve o texto JSON gerado ou um erro amigável com o motivo informado pelo Google.
-async function callGemini(apiKey: string, models: string[], body: unknown): Promise<{ text: string; model: string } | { error: string; status: number }> {
+// Texto JSON da resposta: junta as partes (ignora "pensamentos") e tira cercas ```json.
+function extractJson(out: Record<string, unknown> | null): { text: string | null; finish: string } {
+  const cand = (out?.candidates as Record<string, unknown>[] | undefined)?.[0]
+  const parts = ((cand?.content as Record<string, unknown> | undefined)?.parts as Record<string, unknown>[] | undefined) ?? []
+  const text = parts
+    .filter((p) => typeof p.text === 'string' && !p.thought)
+    .map((p) => p.text as string)
+    .join('')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+  const finish = String(cand?.finishReason ?? (out?.promptFeedback as Record<string, unknown> | undefined)?.blockReason ?? '')
+  return { text: text || null, finish }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// Chama o Gemini com novas tentativas e modelos alternativos. Devolve o objeto JSON já
+// interpretado ou um erro amigável. Resposta cortada/inválida também passa ao próximo modelo.
+async function callGemini(
+  apiKey: string,
+  models: string[],
+  body: unknown,
+): Promise<{ data: Record<string, unknown>; model: string } | { error: string; status: number }> {
   let last: { error: string; status: number } = { error: 'O serviço de IA não respondeu. Tente novamente em instantes.', status: 502 }
+  const started = Date.now()
   for (const model of models) {
-   // Sobrecarga (503/500) ou limite (429): espera um pouco e tenta de novo; depois passa ao próximo modelo.
-   for (let attempt = 1; attempt <= 2; attempt++) {
-    let res: Response
-    try {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-      })
-    } catch {
-      last = { error: 'Não foi possível conectar ao Gemini. Tente novamente em instantes.', status: 502 }
-      continue
-    }
-    if (res.ok) {
-      const out = await res.json().catch(() => null)
-      const text = out?.candidates?.[0]?.content?.parts?.[0]?.text
-      if (typeof text === 'string') return { text, model }
-      const reason = out?.promptFeedback?.blockReason ?? out?.candidates?.[0]?.finishReason ?? 'resposta vazia'
-      return { error: `O Gemini não devolveu resultado (${reason}). Tente outra foto.`, status: 502 }
-    }
-    const raw = await res.text()
-    console.error('Gemini error', model, res.status, raw)
-    let msg = ''
-    try {
-      msg = JSON.parse(raw)?.error?.message ?? ''
-    } catch {
-      msg = raw.slice(0, 200)
-    }
-    // Modelo inexistente/indisponível: tenta o próximo da lista.
-    if (res.status === 404 || /not found|not supported for generateContent|is not available/i.test(msg)) {
-      last = { error: `Modelo do Gemini indisponível (${model}).`, status: 502 }
+    // Sobrecarga (503/500) ou limite (429): espera crescente (1,5 s, 4 s) e tenta de novo; depois o próximo modelo.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (Date.now() - started > 110_000) return last // margem para o limite de tempo da função
+      let res: Response
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify(body),
+        })
+      } catch {
+        last = { error: 'Não foi possível conectar ao Gemini. Tente novamente em instantes.', status: 502 }
+        await sleep(1500)
+        continue
+      }
+      if (res.ok) {
+        const out = (await res.json().catch(() => null)) as Record<string, unknown> | null
+        const { text, finish } = extractJson(out)
+        if (text) {
+          try {
+            return { data: JSON.parse(text), model }
+          } catch {
+            console.error('Gemini JSON inválido', model, finish, text.slice(0, 300))
+            last = {
+              error:
+                finish === 'MAX_TOKENS'
+                  ? 'O cupom é longo demais para uma leitura só. Tente fotografar em duas partes.'
+                  : 'Não foi possível interpretar a resposta da IA. Tente de novo.',
+              status: 502,
+            }
+            break // tenta o próximo modelo
+          }
+        }
+        console.error('Gemini sem texto', model, finish)
+        if (/SAFETY|PROHIBITED|BLOCK/i.test(finish)) return { error: `O Gemini recusou a imagem (${finish}).`, status: 422 }
+        last = { error: `O Gemini não devolveu resultado (${finish || 'resposta vazia'}). Tente de novo.`, status: 502 }
+        break
+      }
+      const raw = await res.text()
+      console.error('Gemini error', model, res.status, raw.slice(0, 500))
+      let msg = ''
+      try {
+        msg = JSON.parse(raw)?.error?.message ?? ''
+      } catch {
+        msg = raw.slice(0, 200)
+      }
+      // Modelo inexistente/indisponível: tenta o próximo da lista.
+      if (res.status === 404 || /not found|not supported for generateContent|is not available/i.test(msg)) {
+        last = { error: `Modelo do Gemini indisponível (${model}).`, status: 502 }
+        break
+      }
+      if (res.status === 503 || res.status === 500 || res.status === 429 || /high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED/i.test(msg)) {
+        last = {
+          error:
+            res.status === 429 && /quota|RESOURCE_EXHAUSTED/i.test(msg)
+              ? 'A cota diária gratuita do Gemini acabou. Tente amanhã ou ative o faturamento da chave no Google AI Studio.'
+              : 'O Gemini está sobrecarregado no momento. Aguarde alguns minutos e tente de novo.',
+          status: 503,
+        }
+        if (attempt < 3) await sleep(attempt === 1 ? 1500 : 4000)
+        continue
+      }
+      if (/API key not valid|API_KEY_INVALID/i.test(msg)) return { error: 'Chave do Gemini inválida. Confira o secret GEMINI_API_KEY no Supabase.', status: 502 }
+      if (res.status === 403) return { error: `A chave do Gemini não tem permissão: ${msg.slice(0, 160)}`, status: 502 }
+      if (/location is not supported/i.test(msg)) return { error: 'O Gemini não está disponível na região do servidor do Supabase.', status: 502 }
+      if (res.status === 400 && /image|inline_data|mime/i.test(msg)) return { error: `O Gemini não aceitou a imagem: ${msg.slice(0, 160)}`, status: 422 }
+      last = { error: `O Gemini recusou a análise (${res.status}): ${msg.slice(0, 200) || 'sem detalhes'}`, status: 502 }
       break
     }
-    if (res.status === 503 || res.status === 500 || res.status === 429 || /high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED/i.test(msg)) {
-      last = {
-        error: 'O Gemini está sobrecarregado no momento. Aguarde alguns minutos e toque em "Analisar" de novo.',
-        status: 503,
-      }
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 2000))
-      continue
-    }
-    if (/API key not valid|API_KEY_INVALID/i.test(msg)) return { error: 'Chave do Gemini inválida. Confira o secret GEMINI_API_KEY no Supabase.', status: 502 }
-    if (res.status === 403) return { error: `A chave do Gemini não tem permissão: ${msg.slice(0, 160)}`, status: 502 }
-    if (/location is not supported/i.test(msg)) return { error: 'O Gemini não está disponível na região do servidor do Supabase.', status: 502 }
-    return { error: `O Gemini recusou a análise (${res.status}): ${msg.slice(0, 200) || 'sem detalhes'}`, status: 502 }
-   }
   }
   return last
 }
@@ -198,17 +243,12 @@ Deno.serve(async (req) => {
 
   const result = await callGemini(apiKey, models, {
       contents: [{ role: 'user', parts }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
+      // Cupons longos (40+ itens) geram respostas grandes: folga para não cortar o JSON.
+      generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: 'application/json', responseSchema: SCHEMA },
     })
   if ('error' in result) return json({ error: result.error }, result.status)
   const model = result.model
-
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(result.text)
-  } catch {
-    return json({ error: 'Não foi possível interpretar a resposta da IA' }, 502)
-  }
+  const parsed = result.data
 
   if (parsed.unreadable === true) {
     return json({ error: 'Não consegui ler este comprovante. Tente uma foto mais nítida, reta e bem iluminada.' }, 422)

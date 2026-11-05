@@ -1,0 +1,37 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@supabase/supabase-js@2": "2.119.0"
+  },
+  "jsr": {
+    "@supabase/supabase-js@2.119.0": {
+      "integrity": "1bb0b15e3953d973ddea394ad12a0759752965bf319367b18465572d10968707"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@fontsource-variable/inter@^5.3.0",
+        "npm:@supabase/supabase-js@^2.119.0",
+        "npm:@tailwindcss/vite@^4.3.4",
+        "npm:@types/node@^24.19.2",
+        "npm:@types/react-dom@^19.3.0",
+        "npm:@types/react@^19.3.0",
+        "npm:@vitejs/plugin-react@^6.1.2",
+        "npm:clsx@^2.1.1",
+        "npm:jsqr@^1.4.0",
+        "npm:lucide-react@^1.69.0",
+        "npm:oxlint@^1.90.0",
+        "npm:react-dom@^19.3.1",
+        "npm:react-router@^8.5.1",
+        "npm:react@^19.3.1",
+        "npm:tailwindcss@^4.3.4",
+        "npm:typescript@~7.0.2",
+        "npm:vite-plugin-pwa@2",
+        "npm:vite@^8.3.6",
+        "npm:vitest@^5.1.0",
+        "npm:workbox-window@^7.4.1"
+      ]
+    }
+  }
+}

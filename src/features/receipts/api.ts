@@ -177,7 +177,8 @@ export async function importXml(householdId: string, file: File): Promise<string
 
 /** Foto do cupom → IA (Edge Function) → rascunho para revisão. */
 export async function importPhoto(householdId: string, file: File): Promise<string> {
-  const blob = await compressImage(file)
+  // Cupons são longos e de letra miúda: mantém até 3000 px no lado maior.
+  const blob = await compressImage(file, 3000, 0.9)
   const mime = blob === file ? file.type || 'image/jpeg' : 'image/jpeg'
   const fileId = await uploadReceiptFile(householdId, blob, mime)
   const data = await invoke<ReceiptData>('receipt-ai', { file_id: fileId })
