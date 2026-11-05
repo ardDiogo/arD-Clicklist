@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, ExternalLink, FileCode2, ImageUp, QrCode, ReceiptText, ScanText } from 'lucide-react'
+import { BarChart3, Camera, ChevronRight, ExternalLink, Images, FileCode2, ImageUp, QrCode, ReceiptText, ScanText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -30,6 +30,8 @@ export function PurchasesPage() {
   const [sefazUrl, setSefazUrl] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
   const printRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
+  const [photoMenu, setPhotoMenu] = useState(false)
   const [buyers, setBuyers] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export function PurchasesPage() {
         <section className="mb-6 space-y-3">
           <div className="grid grid-cols-3 gap-2.5">
             <ImportButton icon={QrCode} label="QR Code" hint="NFC-e" onClick={() => { setError(null); setQrOpen(true) }} disabled={!!processing} />
-            <ImportButton icon={ScanText} label="Foto" hint="Leitura com IA" onClick={() => photoRef.current?.click()} disabled={!!processing} />
+            <ImportButton icon={ScanText} label="Foto" hint="Leitura com IA" onClick={() => setPhotoMenu(true)} disabled={!!processing} />
             <ImportButton icon={FileCode2} label="XML" hint="NF-e / NFC-e" onClick={() => xmlRef.current?.click()} disabled={!!processing} />
           </div>
           <input
@@ -141,6 +143,44 @@ export function PurchasesPage() {
               if (f) void run('Lendo o print da nota com IA…', () => importPhoto(household.id, f))
             }}
           />
+          {/* Foto do cupom já salva na galeria (sem abrir a câmera). */}
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) void run('Lendo o cupom com IA…', () => importPhoto(household.id, f))
+            }}
+          />
+          <Dialog open={photoMenu} onClose={() => setPhotoMenu(false)} title="Foto do cupom">
+            <div className="grid gap-2.5">
+              <Button
+                icon={<Camera className="size-4" />}
+                onClick={() => {
+                  setPhotoMenu(false)
+                  photoRef.current?.click()
+                }}
+              >
+                Tirar foto agora
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Images className="size-4" />}
+                onClick={() => {
+                  setPhotoMenu(false)
+                  galleryRef.current?.click()
+                }}
+              >
+                Escolher da galeria
+              </Button>
+              <p className="pt-1 text-[12px] text-fg-muted">
+                Funciona com foto do cupom impresso ou print da nota no site da SEFAZ. Fotografe reto, com boa luz e o cupom inteiro.
+              </p>
+            </div>
+          </Dialog>
           {processing && !qrOpen && (
             <Card className="flex items-center gap-3 px-4 py-3 text-[14px] text-fg-muted animate-fade-in">
               <Spinner className="size-4" /> {processing}
