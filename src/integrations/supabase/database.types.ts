@@ -640,6 +640,10 @@ export type Database = {
         Args: { p_household_id: string }
         Returns: { from_id: string; from_name: string; from_qty: number; into_id: string; into_name: string; into_qty: number }[]
       }
+      rebuild_shopping_list: {
+        Args: { p_household_id: string; p_mode: 'stock' | 'average'; p_months?: number; p_subtract_stock?: boolean }
+        Returns: { list_id: string; removed_items: number; added: number; months_with_data: number }[]
+      }
       remove_shopping_list: { Args: { p_list_id: string; p_revert_stock?: boolean }; Returns: number }
       set_product_list_exclusion: { Args: { p_household_product_id: string; p_exclude: boolean }; Returns: number }
       set_purchase_buyer: { Args: { p_purchase_id: string; p_user_id: string | null }; Returns: undefined }

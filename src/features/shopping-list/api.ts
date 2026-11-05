@@ -57,6 +57,19 @@ export async function resetList(householdId: string, months = 3) {
   return rows[0] ?? null
 }
 
+/** Limpa a lista aberta e monta de novo por um critério só (estoque ou média das compras). */
+export async function rebuildList(householdId: string, mode: 'stock' | 'average', months = 3, subtractStock = false) {
+  const rows = unwrap(
+    await supabase().rpc('rebuild_shopping_list', {
+      p_household_id: householdId,
+      p_mode: mode,
+      p_months: months,
+      p_subtract_stock: subtractStock,
+    }),
+  )
+  return rows[0] ?? null
+}
+
 export async function addProduct(listId: string, householdProductId: string, quantity = 1): Promise<string> {
   return unwrap(
     await supabase().rpc('add_product_to_list', {

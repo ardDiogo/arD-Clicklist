@@ -13,7 +13,7 @@ import { ListSkeleton, Segmented } from '@/features/inventory/components'
 import { useStock } from '@/features/inventory/hooks'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency } from '@/lib/format'
-import { addCustomItem, addProduct, completeList, generateList, removeItem, resetList, setChecked, suggestFromHistory, updateItem } from './api'
+import { addCustomItem, addProduct, completeList, generateList, rebuildList, removeItem, resetList, setChecked, updateItem } from './api'
 import { AddItemBar, ListRow } from './components'
 import { listTotals, missingFromList, organizeList, type ListItem } from './domain'
 import { useOpenShoppingList } from './hooks'
@@ -63,26 +63,35 @@ export function ShoppingListPage() {
     setSuggestOpen(false)
     setSuggesting(true)
     try {
-      const r = await suggestFromHistory(household.id, months, subtractStock)
+      const r = await rebuildList(household.id, 'average', months, subtractStock)
       await reload()
       if (!r || r.months_with_data === 0) {
         toast.show(`Ainda não há compras dos últimos ${months} meses (sem contar o mês atual) para calcular a média`)
-      } else if (r.added === 0) {
-        const reasons = [
-          r.already_in_list ? `${r.already_in_list} já ${r.already_in_list === 1 ? 'está' : 'estão'} na lista` : null,
-          r.covered_by_stock ? `${r.covered_by_stock} com estoque suficiente em casa` : null,
-          r.removed_by_user ? `${r.removed_by_user} removido${r.removed_by_user === 1 ? '' : 's'} por você (adicione pela busca)` : null,
-        ].filter(Boolean)
-        toast.show(reasons.length ? `Nada novo para sugerir: ${reasons.join(' · ')}` : 'Nada novo: a lista já cobre o consumo médio dos últimos meses')
       } else {
         toast.show(
-          `+${r.added} ${r.added === 1 ? 'item' : 'itens'} pela média de compra de ${r.months_with_data} ${r.months_with_data === 1 ? 'mês' : 'meses'}${subtractStock ? ' (descontando o estoque)' : ''}`,
+          `Lista montada pela média de ${r.months_with_data} ${r.months_with_data === 1 ? 'mês' : 'meses'}: ${r.added} ${r.added === 1 ? 'item' : 'itens'}${subtractStock ? ' (descontando o estoque)' : ''}`,
         )
       }
     } catch (e) {
       toast.error(toMessage(e))
     } finally {
       setSuggesting(false)
+    }
+  }
+
+  const [stockConfirm, setStockConfirm] = useState(false)
+
+  async function buildFromStock() {
+    setStockConfirm(false)
+    setSyncing(true)
+    try {
+      const r = await rebuildList(household.id, 'stock')
+      await reload()
+      toast.show(r?.added ? `Lista montada pelo estoque: ${r.added} ${r.added === 1 ? 'item' : 'itens'}` : 'Nada abaixo do ideal em casa: a lista ficou vazia')
+    } catch (e) {
+      toast.error(toMessage(e))
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -157,7 +166,7 @@ export function ShoppingListPage() {
           {canEdit && (
             <BuildListCard
               syncing={syncing}
-              onStock={() => void sync()}
+              onStock={() => (items.length > 0 ? setStockConfirm(true) : void buildFromStock())}
               suggesting={suggesting}
               onSuggest={() => setSuggestOpen(true)}
               onPhotos={() => navigate('/inventario?voltar=lista')}
@@ -265,7 +274,26 @@ export function ShoppingListPage() {
         />
       )}
 
-      <SuggestDialog open={suggestOpen} onClose={() => setSuggestOpen(false)} onConfirm={(m, sub) => void suggest(m, sub)} />
+      <SuggestDialog
+        open={suggestOpen}
+        replaces={items.length}
+        onClose={() => setSuggestOpen(false)}
+        onConfirm={(m, sub) => void suggest(m, sub)}
+      />
+      <Dialog open={stockConfirm} onClose={() => setStockConfirm(false)} title="Montar pelo estoque">
+        <div className="space-y-4 text-[14px] leading-5">
+          <p className="text-fg-muted">
+            A lista atual ({items.length} {items.length === 1 ? 'item' : 'itens'}) será substituída pelos produtos que estão abaixo do ideal em
+            casa, com a quantidade que falta.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setStockConfirm(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void buildFromStock()}>Substituir lista</Button>
+          </div>
+        </div>
+      </Dialog>
 
       {list && (
         <FinishDialog
@@ -459,7 +487,17 @@ function BuildListCard({
 }
 
 /** Escolha do cálculo pela média de compras. */
-function SuggestDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: (months: number, subtractStock: boolean) => void }) {
+function SuggestDialog({
+  open,
+  replaces,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  replaces: number
+  onClose: () => void
+  onConfirm: (months: number, subtractStock: boolean) => void
+}) {
   const [months, setMonths] = useState(3)
   const [subtract, setSubtract] = useState(false)
   const radio = (on: boolean) =>
@@ -498,13 +536,18 @@ function SuggestDialog({ open, onClose, onConfirm }: { open: boolean; onClose: (
         </label>
         <p className="text-[12px] text-fg-subtle">
           Conta os meses anteriores ao atual. Produtos comprados menos de uma vez por mês, em média, e os marcados “Não envia à lista” ficam
-          de fora. Itens que você ajustou ou removeu da lista não são alterados.
+          de fora.
         </p>
+        {replaces > 0 && (
+          <p className="rounded-lg bg-surface-muted px-3 py-2 text-[13px] text-fg-muted">
+            A lista atual ({replaces} {replaces === 1 ? 'item' : 'itens'}) será substituída.
+          </p>
+        )}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={() => onConfirm(months, subtract)}>Montar lista</Button>
+          <Button onClick={() => onConfirm(months, subtract)}>{replaces > 0 ? 'Substituir lista' : 'Montar lista'}</Button>
         </div>
       </div>
     </Dialog>
