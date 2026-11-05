@@ -65,7 +65,7 @@ export async function analyzeScan(scanId: string, onProgress?: (step: string) =>
       const payload = await error.context.json().catch(() => null)
       throw new Error(payload?.error ?? 'O serviço de IA não respondeu. Tente novamente.')
     }
-    throw new Error('Serviço indisponível. Verifique se a função "inventory-ai" foi publicada no Supabase.')
+    throw new Error('Serviço indisponível. Verifique se a função "inventory-ai" foi publicada no Supabase (com "Verify JWT" desligado).')
   }
   const { detections, model } = data as { detections: unknown[]; model?: string }
   unwrap(

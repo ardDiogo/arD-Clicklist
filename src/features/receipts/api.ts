@@ -27,7 +27,7 @@ async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T
     }
     throw new Error(
       /Failed to send|fetch/i.test(error.message)
-        ? `Serviço indisponível. Verifique se a função "${name}" foi publicada no Supabase.`
+        ? `Serviço indisponível. Verifique se a função "${name}" foi publicada no Supabase (com "Verify JWT" desligado).`
         : error.message,
     )
   }

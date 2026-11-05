@@ -2,16 +2,21 @@
 // Busca a página pública de consulta da NFC-e (link do QR Code) no portal da SEFAZ.
 // O navegador não consegue fazer isso direto por causa de CORS.
 //
+// Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
+// (o verificador do painel não aceita as chaves de assinatura novas do Supabase).
+//
 // Segurança:
-//   * Exige usuário autenticado (JWT verificado pelo gateway do Supabase).
+//   * Exige usuário autenticado (sessão validada no Supabase Auth).
 //   * Só acessa endereços *.gov.br (evita uso como proxy aberto / SSRF).
 //   * Limite de tempo e de tamanho da resposta.
 //
 // Deploy pelo painel: Edge Functions → Deploy a new function → "nfce-proxy" → cole este arquivo.
 
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -30,7 +35,13 @@ function isAllowed(url: URL) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405)
-  if (!req.headers.get('authorization')) return json({ error: 'Não autenticado' }, 401)
+  const auth = req.headers.get('authorization')
+  if (!auth) return json({ error: 'Não autenticado' }, 401)
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, (Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY'))!, {
+    global: { headers: { Authorization: auth } },
+  })
+  const { data: userData, error: userErr } = await supabase.auth.getUser(auth.replace(/^Bearer\s+/i, ''))
+  if (userErr || !userData?.user) return json({ error: 'Sessão inválida. Entre novamente no app.' }, 401)
 
   let target: URL
   try {

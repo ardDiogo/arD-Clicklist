@@ -7,6 +7,8 @@
 //   GEMINI_MODEL     opcional (padrão: gemini-2.5-flash)
 // SUPABASE_URL e SUPABASE_ANON_KEY já são fornecidos automaticamente.
 //
+// Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
+// (o verificador do painel não aceita as chaves de assinatura novas do Supabase).
 // Segurança: o arquivo é lido com o token do PRÓPRIO usuário, então o RLS do
 // Storage garante que só membros da família acessam a imagem.
 //
@@ -16,7 +18,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -97,9 +99,12 @@ Deno.serve(async (req) => {
   if (!/^[0-9a-f-]{36}$/i.test(fileId)) return json({ error: 'Arquivo inválido' }, 400)
 
   // Cliente com o token do usuário: RLS decide o que ele pode ler.
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, (Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY'))!, {
     global: { headers: { Authorization: auth } },
   })
+  // Valida a sessão aqui (funciona com as chaves novas do Supabase; deixe "Verify JWT" desligado).
+  const { data: userData, error: userErr } = await supabase.auth.getUser(auth.replace(/^Bearer\s+/i, ''))
+  if (userErr || !userData?.user) return json({ error: 'Sessão inválida. Entre novamente no app.' }, 401)
 
   const { data: file, error: fileErr } = await supabase
     .from('purchase_files')

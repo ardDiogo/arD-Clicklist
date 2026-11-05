@@ -4,6 +4,8 @@
 // NÃO altera o estoque: o app grava como rascunho e o usuário revisa e confirma.
 //
 // Secrets: GEMINI_API_KEY (obrigatório), GEMINI_MODEL (opcional, padrão gemini-2.5-flash).
+// Publicação: deixe "Verify JWT" DESLIGADO — a função valida a sessão por conta própria
+// (o verificador do painel não aceita as chaves de assinatura novas do Supabase).
 // Segurança: fotos, conferência e catálogo são lidos com o token do PRÓPRIO usuário (RLS).
 //
 // Deploy pelo painel: Edge Functions → Deploy a new function → "inventory-ai" → cole este arquivo.
@@ -12,7 +14,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -94,9 +96,12 @@ Deno.serve(async (req) => {
   }
   if (!/^[0-9a-f-]{36}$/i.test(scanId)) return json({ error: 'Conferência inválida' }, 400)
 
-  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, (Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY'))!, {
     global: { headers: { Authorization: auth } },
   })
+  // Valida a sessão aqui (funciona com as chaves novas do Supabase; deixe "Verify JWT" desligado).
+  const { data: userData, error: userErr } = await supabase.auth.getUser(auth.replace(/^Bearer\s+/i, ''))
+  if (userErr || !userData?.user) return json({ error: 'Sessão inválida. Entre novamente no app.' }, 401)
 
   const { data: scan } = await supabase
     .from('inventory_scans')
