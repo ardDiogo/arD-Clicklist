@@ -27,6 +27,7 @@ import type { HouseholdRole } from '@/integrations/supabase/database.types'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatDate } from '@/lib/format'
+import { InstallSettingsCard } from '@/features/pwa/components'
 import { LocationsCard } from './LocationsCard'
 
 const ROLES: HouseholdRole[] = ['admin', 'editor', 'viewer']
@@ -40,6 +41,7 @@ export function SettingsPage() {
         <MembersCard />
         <LocationsCard />
         <PreferencesCard />
+        <InstallSettingsCard />
         <AccountCard />
       </div>
     </>

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { useHousehold } from '@/features/household/HouseholdProvider'
 import { Logo, Wordmark } from './Logo'
-import { UpdatePrompt } from './UpdatePrompt'
+import { OfflineBanner } from '@/features/pwa/components'
 
 interface NavItem {
   to: string
@@ -48,6 +48,9 @@ function HouseholdSwitcher() {
 export function AppShell() {
   return (
     <div className="min-h-dvh lg:flex">
+      <div className="fixed inset-x-0 top-0 z-40">
+        <OfflineBanner />
+      </div>
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-3 py-5 lg:flex">
         <div className="flex items-center gap-2.5 px-2">
@@ -122,7 +125,6 @@ export function AppShell() {
         </div>
       </nav>
 
-      <UpdatePrompt />
     </div>
   )
 }

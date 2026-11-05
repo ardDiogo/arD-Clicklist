@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
+import { UpdatePrompt } from '@/components/layout/UpdatePrompt'
 import { ToastProvider } from '@/components/ui/Toast'
 import { FinancePage } from '@/features/analytics/FinancePage'
 import { AuthProvider } from '@/features/auth/AuthProvider'
@@ -81,5 +82,11 @@ const router = createBrowserRouter([
 export function App() {
   useTheme()
   if (!isSupabaseConfigured) return <SetupRequired />
-  return <RouterProvider router={router} />
+  return (
+    <>
+      <RouterProvider router={router} />
+      {/* Registra o service worker desde a primeira tela (inclusive login) e avisa sobre versões novas. */}
+      <UpdatePrompt />
+    </>
+  )
 }

@@ -9,6 +9,7 @@ import { can } from '@/features/household/roles'
 import { StatusDot } from '@/features/inventory/components'
 import { formatQty, productSubtitle } from '@/features/inventory/domain'
 import { useStock } from '@/features/inventory/hooks'
+import { InstallBanner } from '@/features/pwa/components'
 
 function greeting(date = new Date()): string {
   const h = date.getHours()
@@ -33,6 +34,7 @@ export function DashboardPage() {
   return (
     <>
       <PageHeader title={`${greeting()}${firstName ? `, ${firstName}` : ''}`} description={household.name} />
+      <InstallBanner />
 
       {/* Números reais do estoque — sem dados fictícios */}
       <div className="grid grid-cols-3 gap-3 animate-fade-in">

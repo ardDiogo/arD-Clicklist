@@ -36,6 +36,13 @@ Supabase (Postgres, Auth, Realtime, Storage, Edge Functions) · Vercel.
 - **UI**: pt-BR, mobile-first (tab bar no celular, sidebar no desktop), tema claro
   por padrão + escuro/sistema.
 
+### PWA
+
+- Instalável (Android/desktop por botão; iPhone com passo a passo do Safari) — convite no Início e em Ajustes.
+- Atalhos no ícone (Lista, Registrar compra, Conferir por fotos), prévias na janela de instalação, ícones maskable.
+- Service worker registrado desde a primeira tela: o app abre sem internet (só o app; os dados sempre vêm do
+  servidor, para não mostrar estoque desatualizado) e avisa quando está offline e quando há versão nova.
+
 ### O que a Fase 2 entrega
 
 - **Catálogo**: 9 categorias padrão (globais), marcas criadas automaticamente pelo nome
