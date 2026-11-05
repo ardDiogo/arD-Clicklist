@@ -1,7 +1,7 @@
 import { clsx } from 'clsx'
 import { ArrowLeft, Ban, Check, ClipboardCheck, EyeOff, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog } from '@/components/ui/Dialog'
@@ -13,6 +13,7 @@ import { can } from '@/features/household/roles'
 import { formatQty, parseQty, productSubtitle, type StockItem } from '@/features/inventory/domain'
 import { useLocations, useStock } from '@/features/inventory/hooks'
 import { suggestProducts } from '@/features/receipts/domain'
+import { generateList } from '@/features/shopping-list/api'
 import { toMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import { analyzeScan, confirmScan, discardScan, getScan, getScanItems, getScanPhotoUrls, updateScanItem } from './api'
@@ -29,6 +30,8 @@ import {
 
 export function ScanReviewPage() {
   const { id = '' } = useParams()
+  const [params] = useSearchParams()
+  const fromList = params.get('voltar') === 'lista'
   const { household, role } = useCurrentHousehold()
   const navigate = useNavigate()
   const toast = useToast()
@@ -107,7 +110,7 @@ export function ScanReviewPage() {
 
   return (
     <div className={clsx('space-y-5 animate-fade-in', editable && 'pb-24')}>
-      <Link to="/inventario" className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted hover:text-fg">
+      <Link to={fromList ? '/inventario?voltar=lista' : '/inventario'} className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted hover:text-fg">
         <ArrowLeft className="size-4" /> Conferências
       </Link>
 
@@ -218,12 +221,25 @@ export function ScanReviewPage() {
 
       <Dialog open={confirming} onClose={() => setConfirming(false)} title="Confirmar conferência">
         <ConfirmBody
+          note={fromList ? 'Depois de confirmar, a lista de compras é atualizada com o que falta.' : undefined}
           adjustments={adjustments}
           onCancel={() => setConfirming(false)}
           onConfirm={async () => {
             try {
               const n = await confirmScan(scan.id)
               setConfirming(false)
+              if (fromList) {
+                // Estoque conferido → lista recalculada (ideal − atual) e volta para ela.
+                const r = await generateList(household.id)
+                const changes = (r?.added ?? 0) + (r?.updated ?? 0)
+                toast.show(
+                  changes
+                    ? `Despensa conferida · lista atualizada (+${r?.added ?? 0} itens)`
+                    : 'Despensa conferida · a lista já estava em dia',
+                )
+                navigate('/lista')
+                return
+              }
               toast.show(n ? `Estoque ajustado em ${n} ${n === 1 ? 'produto' : 'produtos'}` : 'Conferência registrada, sem diferenças')
               await Promise.all([load(), reloadStock()])
             } catch (e) {
@@ -443,10 +459,12 @@ function ReadyRow({ item, editable, product, onSave }: RowProps) {
 
 function ConfirmBody({
   adjustments,
+  note,
   onCancel,
   onConfirm,
 }: {
   adjustments: ReturnType<typeof buildAdjustments>
+  note?: string
   onCancel: () => void
   onConfirm: () => Promise<void>
 }) {
@@ -471,6 +489,7 @@ function ConfirmBody({
           </ul>
         </>
       )}
+      {note && <p className="text-[13px] text-fg-muted">{note}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
           Voltar

@@ -1,6 +1,6 @@
 import { ArrowLeft, Camera, ChevronRight, ImagePlus, ScanSearch, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { SelectField } from '@/components/ui/Field'
@@ -34,20 +34,24 @@ export function ScansPage() {
 
   const drafts = scans?.filter((s) => s.status === 'draft') ?? []
   const done = scans?.filter((s) => s.status === 'confirmed') ?? []
+  const [params] = useSearchParams()
+  const fromList = params.get('voltar') === 'lista'
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <Link to="/estoque" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-fg-muted hover:text-fg">
-          <ArrowLeft className="size-4" /> Estoque
+        <Link to={fromList ? '/lista' : '/estoque'} className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-fg-muted hover:text-fg">
+          <ArrowLeft className="size-4" /> {fromList ? 'Lista de compras' : 'Estoque'}
         </Link>
         <h1 className="text-[24px] leading-tight font-semibold tracking-[-0.025em]">Conferir por fotos</h1>
         <p className="mt-1 text-[14px] text-fg-muted">
-          Fotografe um ambiente e a IA sugere o que há nele. Você confirma antes de qualquer ajuste no estoque.
+          {fromList
+            ? 'Fotografe a despensa, a geladeira e os armários. Depois de confirmar o que há em casa, a lista de compras é atualizada com o que falta.'
+            : 'Fotografe um ambiente e a IA sugere o que há nele. Você confirma antes de qualquer ajuste no estoque.'}
         </p>
       </div>
 
-      {canEdit && <NewScanCard householdId={household.id} />}
+      {canEdit && <NewScanCard householdId={household.id} suffix={fromList ? '?voltar=lista' : ''} />}
 
       {error ? (
         <Alert>{error}</Alert>
@@ -55,7 +59,7 @@ export function ScansPage() {
         <ListSkeleton rows={2} />
       ) : scans.length === 0 ? null : (
         <>
-          {drafts.length > 0 && <ScanList title="Para revisar" scans={drafts} highlight />}
+          {drafts.length > 0 && <ScanList title="Para revisar" scans={drafts} highlight suffix={fromList ? '?voltar=lista' : ''} />}
           {done.length > 0 && <ScanList title="Conferências anteriores" scans={done} />}
         </>
       )}
@@ -63,7 +67,7 @@ export function ScansPage() {
   )
 }
 
-function NewScanCard({ householdId }: { householdId: string }) {
+function NewScanCard({ householdId, suffix }: { householdId: string; suffix: string }) {
   const navigate = useNavigate()
   const { data: locations } = useLocations(householdId)
   const [locationId, setLocationId] = useState('')
@@ -91,7 +95,7 @@ function NewScanCard({ householdId }: { householdId: string }) {
     setError(null)
     try {
       const id = await createAndAnalyzeScan(householdId, locationId || null, photos, setProgress)
-      navigate(`/inventario/${id}`)
+      navigate(`/inventario/${id}${suffix}`)
     } catch (e) {
       setError(e instanceof Error && !('code' in e) ? e.message : toMessage(e))
       setProgress(null)
@@ -161,7 +165,7 @@ function NewScanCard({ householdId }: { householdId: string }) {
   )
 }
 
-function ScanList({ title, scans, highlight }: { title: string; scans: ScanSummary[]; highlight?: boolean }) {
+function ScanList({ title, scans, highlight, suffix = '' }: { title: string; scans: ScanSummary[]; highlight?: boolean; suffix?: string }) {
   return (
     <section>
       <h2 className="mb-2 flex items-baseline gap-2 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">
@@ -171,7 +175,7 @@ function ScanList({ title, scans, highlight }: { title: string; scans: ScanSumma
         <ul className="divide-y divide-border">
           {scans.map((s) => (
             <li key={s.id}>
-              <Link to={`/inventario/${s.id}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted/60">
+              <Link to={`/inventario/${s.id}${suffix}`} className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-muted/60">
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-medium">{s.location_name ?? 'Vários ambientes'}</p>
                   <p className="text-[13px] text-fg-muted">

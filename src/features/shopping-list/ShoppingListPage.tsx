@@ -1,6 +1,6 @@
-import { CalendarClock, History, ListChecks, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
+import { CalendarClock, Camera, History, ListChecks, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -22,6 +22,7 @@ export function ShoppingListPage() {
   const { household, role } = useCurrentHousehold()
   const canEdit = can.edit(role)
   const toast = useToast()
+  const navigate = useNavigate()
   const { list, items, removed, loading, error, reload, patchItem } = useOpenShoppingList(household.id, canEdit)
   const { data: stock } = useStock(household.id)
   const [syncing, setSyncing] = useState(false)
@@ -142,6 +143,14 @@ export function ShoppingListPage() {
         <div className="space-y-5 pb-24">
           {canEdit && stock && <AddItemBar stock={stock} onAddProduct={(s) => act(() => addProduct(list.id, s.id, Math.max(1, s.to_buy_qty || 1)).then(reload))} onAddCustom={(n) => act(() => addCustomItem(list.id, n).then(reload))} />}
 
+          {canEdit && (
+            <BuildListCard
+              suggesting={suggesting}
+              onSuggest={() => void suggest()}
+              onPhotos={() => navigate('/inventario?voltar=lista')}
+            />
+          )}
+
           {canEdit && missing.length > 0 && (
             <button
               type="button"
@@ -205,22 +214,11 @@ export function ShoppingListPage() {
             </>
           )}
 
-          {canEdit && (
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={suggesting}
-                icon={<CalendarClock className="size-3.5" />}
-                onClick={() => void suggest()}
-              >
-                Sugerir pelo consumo dos últimos meses
+          {canEdit && missing.length === 0 && items.length > 0 && (
+            <div className="flex justify-center">
+              <Button size="sm" variant="ghost" loading={syncing} icon={<RefreshCw className="size-3.5" />} onClick={() => void sync()}>
+                Atualizar pelo estoque
               </Button>
-              {missing.length === 0 && items.length > 0 && (
-                <Button size="sm" variant="ghost" loading={syncing} icon={<RefreshCw className="size-3.5" />} onClick={() => void sync()}>
-                  Atualizar pelo estoque
-                </Button>
-              )}
             </div>
           )}
         </div>
@@ -355,5 +353,48 @@ function FinishDialog({
         </div>
       </div>
     </Dialog>
+  )
+}
+
+/** As duas formas de montar a lista: pelo histórico de compras ou conferindo a despensa por fotos. */
+function BuildListCard({
+  suggesting,
+  onSuggest,
+  onPhotos,
+}: {
+  suggesting: boolean
+  onSuggest: () => void
+  onPhotos: () => void
+}) {
+  const option =
+    'flex min-w-0 items-start gap-3 rounded-xl border border-border bg-surface p-3.5 text-left shadow-card transition-[background-color,transform] hover:bg-surface-muted/60 active:scale-[0.99] disabled:opacity-60'
+  return (
+    <section aria-label="Montar a lista">
+      <h2 className="mb-2 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">Montar a lista</h2>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <button type="button" className={option} onClick={onSuggest} disabled={suggesting}>
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100">
+            {suggesting ? <RefreshCw className="size-[18px] animate-spin" /> : <CalendarClock className="size-[18px]" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-medium">Pelo consumo dos últimos meses</span>
+            <span className="block text-[12px] leading-4 text-fg-muted">
+              Média das compras dos 3 meses anteriores, descontando o que há em casa.
+            </span>
+          </span>
+        </button>
+        <button type="button" className={option} onClick={onPhotos}>
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-muted text-fg-muted">
+            <Camera className="size-[18px]" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-medium">Pelas fotos da despensa</span>
+            <span className="block text-[12px] leading-4 text-fg-muted">
+              Fotografe os armários, confirme o que há em casa e a lista mostra o que falta.
+            </span>
+          </span>
+        </button>
+      </div>
+    </section>
   )
 }
