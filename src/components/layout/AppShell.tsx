@@ -10,7 +10,7 @@ interface NavItem {
   to: string
   label: string
   icon: LucideIcon
-  /** No celular a barra tem 5 posições; itens extras ficam só no menu lateral. */
+  /** No celular a barra tem 5 posições; Ajustes fica no cabeçalho (ícone de engrenagem). */
   desktopOnly?: boolean
 }
 
@@ -19,8 +19,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/estoque', label: 'Estoque', icon: Boxes },
   { to: '/lista', label: 'Lista', icon: ListChecks },
   { to: '/compras', label: 'Compras', icon: ReceiptText },
-  { to: '/inteligencia', label: 'Inteligência', icon: BarChart3, desktopOnly: true },
-  { to: '/ajustes', label: 'Ajustes', icon: Settings },
+  { to: '/inteligencia', label: 'Inteligência', icon: BarChart3 },
+  { to: '/ajustes', label: 'Ajustes', icon: Settings, desktopOnly: true },
 ]
 
 function HouseholdSwitcher() {
@@ -88,6 +88,16 @@ export function AppShell() {
         <div className="min-w-0 flex-1">
           <HouseholdSwitcher />
         </div>
+        {/* No celular, Ajustes fica aqui; a barra inferior tem 5 posições. */}
+        <NavLink
+          to="/ajustes"
+          aria-label="Ajustes"
+          className={({ isActive }) =>
+            clsx('grid size-9 place-items-center rounded-lg transition-colors', isActive ? 'bg-surface-muted text-fg' : 'text-fg-muted hover:text-fg')
+          }
+        >
+          <Settings className="size-5" strokeWidth={1.75} />
+        </NavLink>
       </header>
 
       <main className="min-w-0 flex-1 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-10">
