@@ -7,7 +7,20 @@ export function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW()
+  } = useRegisterSW({
+    // O app instalado pode ficar aberto por dias: procura versão nova ao voltar
+    // para o app e a cada 30 minutos (no iPhone isso não acontece sozinho).
+    onRegisteredSW(_url, registration) {
+      if (!registration) return
+      const check = () => {
+        if (navigator.onLine) void registration.update().catch(() => undefined)
+      }
+      setInterval(check, 30 * 60 * 1000)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check()
+      })
+    },
+  })
 
   if (!needRefresh) return null
 

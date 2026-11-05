@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { Check, Copy, LogOut, Monitor, Moon, Sun, UserPlus, X } from 'lucide-react'
+import { Check, Copy, LogOut, Monitor, RefreshCw, Moon, Sun, UserPlus, X } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Avatar } from '@/components/ui/Avatar'
@@ -450,7 +450,32 @@ function AccountCard() {
         <Button variant="secondary" size="sm" icon={<LogOut className="size-4" />} onClick={() => void signOut()}>
           Sair
         </Button>
+        <AppVersion />
       </div>
     </Card>
+  )
+}
+
+/** Versão instalada + botão para buscar a mais recente (útil no app instalado). */
+function AppVersion() {
+  const [checking, setChecking] = useState(false)
+  async function update() {
+    setChecking(true)
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration()
+      await reg?.update()
+      if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+    } catch {
+      // segue para o recarregamento
+    }
+    window.setTimeout(() => window.location.reload(), 800)
+  }
+  return (
+    <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3 text-[12px] text-fg-muted">
+      <span>Versão {__APP_BUILD__}</span>
+      <Button variant="ghost" size="sm" icon={<RefreshCw className="size-3.5" />} onClick={() => void update()} disabled={checking}>
+        {checking ? 'Atualizando…' : 'Buscar atualização'}
+      </Button>
+    </div>
   )
 }
