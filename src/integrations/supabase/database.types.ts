@@ -228,6 +228,7 @@ export type Database = {
           access_key: string | null
           file_sha256: string | null
           revision: number
+          bought_by: string | null
           source_url: string | null
           total_amount: number | null
           discount_amount: number | null
@@ -622,6 +623,7 @@ export type Database = {
         Returns: number
       }
       reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      set_purchase_buyer: { Args: { p_purchase_id: string; p_user_id: string | null }; Returns: undefined }
       remove_purchase: { Args: { p_purchase_id: string }; Returns: number }
       update_purchase_item_values: {
         Args: { p_item_id: string; p_description: string; p_quantity: number; p_total_price: number }

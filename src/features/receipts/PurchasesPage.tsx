@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Dialog } from '@/components/ui/Dialog'
 import { Alert, Badge, EmptyState } from '@/components/ui/feedback'
 import { Spinner } from '@/components/ui/Spinner'
+import { listMembers } from '@/features/household/api'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
 import { ListSkeleton } from '@/features/inventory/components'
@@ -29,6 +30,14 @@ export function PurchasesPage() {
   const [sefazUrl, setSefazUrl] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
   const printRef = useRef<HTMLInputElement>(null)
+  const [buyers, setBuyers] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    listMembers(household.id).then(
+      (ms) => setBuyers(new Map(ms.filter((m) => m.fullName).map((m) => [m.userId, m.fullName!.split(' ')[0]!]))),
+      () => setBuyers(new Map()),
+    )
+  }, [household.id])
   const xmlRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -155,8 +164,8 @@ export function PurchasesPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {drafts.length > 0 && <PurchaseList title="Para revisar" items={drafts} highlight />}
-          {confirmed.length > 0 && <PurchaseList title="Confirmadas" items={confirmed} />}
+          {drafts.length > 0 && <PurchaseList title="Para revisar" items={drafts} buyers={buyers} highlight />}
+          {confirmed.length > 0 && <PurchaseList title="Confirmadas" items={confirmed} buyers={buyers} />}
         </div>
       )}
 
@@ -238,7 +247,17 @@ function ImportButton({
   )
 }
 
-function PurchaseList({ title, items, highlight }: { title: string; items: PurchaseSummary[]; highlight?: boolean }) {
+function PurchaseList({
+  title,
+  items,
+  buyers,
+  highlight,
+}: {
+  title: string
+  items: PurchaseSummary[]
+  buyers: Map<string, string>
+  highlight?: boolean
+}) {
   return (
     <section>
       <h2 className="mb-2 flex items-baseline gap-2 px-1 text-[12px] font-medium tracking-wide text-fg-subtle uppercase">
@@ -254,6 +273,7 @@ function PurchaseList({ title, items, highlight }: { title: string; items: Purch
                   <p className="text-[13px] text-fg-muted">
                     {formatDate(p.purchased_at ?? p.created_at)} · {p.itemCount} {p.itemCount === 1 ? 'item' : 'itens'} ·{' '}
                     {SOURCE_LABEL[p.source]}
+                    {p.bought_by && buyers.get(p.bought_by) && ` · ${buyers.get(p.bought_by)}`}
                   </p>
                 </div>
                 <div className="text-right">

@@ -258,6 +258,11 @@ export async function renamePurchaseStore(id: string, storeName: string, applyTo
   )
 }
 
+/** Define quem fez a compra (membro da família) ou null. */
+export async function setPurchaseBuyer(id: string, userId: string | null): Promise<void> {
+  unwrap(await supabase().rpc('set_purchase_buyer', { p_purchase_id: id, p_user_id: userId }))
+}
+
 /** Reabre uma compra confirmada para edição (estorna o que ela lançou no estoque). */
 export async function reopenPurchase(id: string): Promise<number> {
   return unwrap(await supabase().rpc('reopen_purchase', { p_purchase_id: id }))

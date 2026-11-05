@@ -1,5 +1,5 @@
 import { clsx } from 'clsx'
-import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ChevronDown, UserRound, Ban, CheckCircle2, ExternalLink, FileImage, PackageCheck, Pencil, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
@@ -9,6 +9,8 @@ import { SelectField, TextField } from '@/components/ui/Field'
 import { Alert, Badge, EmptyState } from '@/components/ui/feedback'
 import { FullPageSpinner } from '@/components/ui/Spinner'
 import { useToast } from '@/components/ui/Toast'
+import { useAuth } from '@/features/auth/AuthProvider'
+import { listMembers, type Member } from '@/features/household/api'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
 import { createTrackedProduct } from '@/features/inventory/api'
@@ -29,6 +31,7 @@ import {
   getPurchaseItems,
   signedFileUrl,
   renamePurchaseStore,
+  setPurchaseBuyer,
   updatePurchaseItem,
 } from './api'
 import { autoProductName, reviewSummary, SOURCE_LABEL, suggestProducts, titleCase, type Purchase, type PurchaseItem } from './domain'
@@ -58,6 +61,11 @@ export function ReviewPage() {
   const [creatingFor, setCreatingFor] = useState<PurchaseItem | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+
+  useEffect(() => {
+    listMembers(household.id).then(setMembers, () => setMembers([]))
+  }, [household.id])
   const [action, setAction] = useState<'reopen' | 'remove' | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -131,6 +139,12 @@ export function ReviewPage() {
           {formatDateTime(purchase.purchased_at ?? purchase.created_at)} · {SOURCE_LABEL[purchase.source]}
           {purchase.total_amount !== null && ` · ${formatCurrency(purchase.total_amount)}`}
         </p>
+        <BuyerPicker
+          purchase={purchase}
+          members={members}
+          editable={can.edit(role) && purchase.status !== 'discarded'}
+          onChanged={(userId) => setPurchase({ ...purchase, bought_by: userId })}
+        />
         <div className="mt-2 flex flex-wrap gap-3">
           {files.map((f) => (
             <OriginalFileLink key={f.storage_path} path={f.storage_path} mime={f.mime_type} />
@@ -832,5 +846,70 @@ function PurchaseActionBody({
         </Button>
       </div>
     </div>
+  )
+}
+
+/** "Comprado por": mostra e altera o membro que fez a compra. */
+function BuyerPicker({
+  purchase,
+  members,
+  editable,
+  onChanged,
+}: {
+  purchase: Purchase
+  members: Member[]
+  editable: boolean
+  onChanged: (userId: string | null) => void
+}) {
+  const { user } = useAuth()
+  const toast = useToast()
+  const [saving, setSaving] = useState(false)
+  const label = (m: Member) => m.fullName ?? (m.userId === user?.id ? 'Você' : 'Membro sem nome')
+  const current = members.find((m) => m.userId === purchase.bought_by)
+  const text = current ? label(current) : purchase.bought_by ? 'Ex-membro' : 'Não informado'
+
+  if (!editable || members.length === 0) {
+    return (
+      <p className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-fg-muted">
+        <UserRound className="size-3.5" /> Comprado por <span className="font-medium text-fg">{text}</span>
+      </p>
+    )
+  }
+
+  async function change(value: string) {
+    const userId = value || null
+    setSaving(true)
+    try {
+      await setPurchaseBuyer(purchase.id, userId)
+      onChanged(userId)
+    } catch (e) {
+      toast.error(toMessage(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <label className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-fg-muted">
+      <UserRound className="size-3.5" /> Comprado por
+      <span className="relative inline-flex items-center">
+        <select
+          aria-label="Quem fez a compra"
+          value={purchase.bought_by ?? ''}
+          disabled={saving}
+          onChange={(e) => void change(e.target.value)}
+          className="appearance-none rounded-md bg-surface-muted py-0.5 pr-6 pl-2 font-medium text-fg disabled:opacity-60"
+        >
+          <option value="">Não informado</option>
+          {purchase.bought_by && !current && <option value={purchase.bought_by}>Ex-membro</option>}
+          {members.map((m) => (
+            <option key={m.userId} value={m.userId}>
+              {label(m)}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-1.5 size-3.5" />
+      </span>
+    </label>
   )
 }
