@@ -109,22 +109,50 @@ async function createDraft(householdId: string, source: PurchaseSource, data: Re
   )
 }
 
+/** Falha ao ler a nota pelo link: guarda o endereço para o usuário abrir no navegador. */
+export class SefazReadError extends Error {
+  readonly sefazUrl: string
+  constructor(message: string, sefazUrl: string) {
+    super(message)
+    this.sefazUrl = sefazUrl
+    this.name = 'SefazReadError'
+  }
+}
+
+/** Resumo do que a SEFAZ devolveu (título ou primeira linha), para diagnóstico. */
+function pageHint(html: string, text: string): string {
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim()
+  const first = text.split('\n').find((l) => l.length > 3)
+  const hint = [title, first].filter(Boolean).join(' — ').slice(0, 120)
+  return hint ? `A página recebida foi: "${hint}" (${text.length} caracteres).` : 'A página veio vazia.'
+}
+
 /** QR Code da NFC-e → página pública da SEFAZ (via Edge Function) → rascunho. */
 export async function importFromQr(householdId: string, qrText: string): Promise<string> {
   const qr = parseNfceQr(qrText)
   if (!qr) throw new Error('Este QR Code não parece ser de uma NFC-e (o link precisa ser de um portal gov.br).')
-  const { html, finalUrl } = await invoke<{ html: string; finalUrl: string }>('nfce-proxy', { url: qr.url })
+  const uf = ufFromAccessKey(qr.accessKey)
+  let page: { html: string; finalUrl: string }
+  try {
+    page = await invoke<{ html: string; finalUrl: string }>('nfce-proxy', { url: qr.url })
+  } catch (e) {
+    throw new SefazReadError(
+      `Não consegui acessar a SEFAZ${uf ? ` de ${uf}` : ''} (${e instanceof Error ? e.message : 'erro desconhecido'}).`,
+      qr.url,
+    )
+  }
+  const { html, finalUrl } = page
   let data = parseNfceHtml(html, finalUrl)
   if (!data) {
     // Layout do estado não reconhecido (ex.: portal de MG): a IA lê o TEXTO da página.
-    const uf = ufFromAccessKey(qr.accessKey)
+    const text = htmlToText(html)
     try {
-      const fromText = await invoke<ReceiptData>('receipt-ai', { text: htmlToText(html) })
+      const fromText = await invoke<ReceiptData>('receipt-ai', { text })
       data = finalizeReceipt({ ...fromText, source_url: finalUrl })
-    } catch (e) {
-      throw new Error(
-        `Não consegui ler a página da SEFAZ${uf ? ` de ${uf}` : ''} (${e instanceof Error ? e.message : 'erro desconhecido'}). ` +
-          'Use a opção "Foto do cupom" ou o arquivo XML.',
+    } catch {
+      throw new SefazReadError(
+        `A SEFAZ${uf ? ` de ${uf}` : ''} não devolveu os itens da nota para o app. ${pageHint(html, text)}`,
+        qr.url,
       )
     }
   }

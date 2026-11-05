@@ -27,7 +27,7 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 }
 
-const PROMPT = `Você lê cupons fiscais brasileiros (NFC-e / cupom de supermercado).
+const PROMPT = `Você lê cupons fiscais brasileiros (NFC-e / cupom de supermercado) — foto do cupom impresso ou print (captura de tela) da página de consulta da NFC-e no site da SEFAZ.
 Extraia SOMENTE o que está impresso na imagem. Regras:
 - Não invente produtos, quantidades ou valores. Se algo estiver ilegível, use null.
 - Uma entrada por linha de produto, na ordem do cupom. Ignore linhas de troco, pagamento e tributos.

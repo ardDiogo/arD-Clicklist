@@ -1,4 +1,4 @@
-import { BarChart3, ChevronRight, FileCode2, QrCode, ReceiptText, ScanText } from 'lucide-react'
+import { BarChart3, ChevronRight, ExternalLink, FileCode2, ImageUp, QrCode, ReceiptText, ScanText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -13,7 +13,7 @@ import { ListSkeleton } from '@/features/inventory/components'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { importFromQr, importPhoto, importXml, listPurchases, type PurchaseSummary } from './api'
+import { importFromQr, importPhoto, importXml, listPurchases, SefazReadError, type PurchaseSummary } from './api'
 import { SOURCE_LABEL } from './domain'
 import { QrScanner } from './QrScanner'
 
@@ -26,7 +26,9 @@ export function PurchasesPage() {
   const [qrOpen, setQrOpen] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sefazUrl, setSefazUrl] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
+  const printRef = useRef<HTMLInputElement>(null)
   const xmlRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -51,6 +53,7 @@ export function PurchasesPage() {
 
   async function run(label: string, fn: () => Promise<string>) {
     setError(null)
+    setSefazUrl(null)
     setProcessing(label)
     try {
       const id = await fn()
@@ -58,6 +61,7 @@ export function PurchasesPage() {
       navigate(`/compras/${id}`)
     } catch (e) {
       setError(e instanceof Error && !('code' in e) ? e.message : toMessage(e))
+      if (e instanceof SefazReadError) setSefazUrl(e.sefazUrl)
     } finally {
       setProcessing(null)
     }
@@ -116,12 +120,24 @@ export function PurchasesPage() {
               if (f) void run('Lendo o XML…', () => importXml(household.id, f))
             }}
           />
+          {/* Print da página da SEFAZ (galeria, sem abrir a câmera). */}
+          <input
+            ref={printRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) void run('Lendo o print da nota com IA…', () => importPhoto(household.id, f))
+            }}
+          />
           {processing && !qrOpen && (
             <Card className="flex items-center gap-3 px-4 py-3 text-[14px] text-fg-muted animate-fade-in">
               <Spinner className="size-4" /> {processing}
             </Card>
           )}
-          {error && !qrOpen && <Alert>{error}</Alert>}
+          {error && !qrOpen && <ImportError error={error} sefazUrl={sefazUrl} onPrint={() => printRef.current?.click()} />}
         </section>
       )}
 
@@ -154,11 +170,44 @@ export function PurchasesPage() {
             ) : (
               <QrScanner onResult={onQr} busy={!!processing} />
             )}
-            {error && <Alert>{error}</Alert>}
+            {error && (
+              <ImportError
+                error={error}
+                sefazUrl={sefazUrl}
+                onPrint={() => {
+                  setQrOpen(false)
+                  printRef.current?.click()
+                }}
+              />
+            )}
           </div>
         )}
       </Dialog>
     </>
+  )
+}
+
+/** Erro de importação; para QR com falha na SEFAZ, oferece abrir a nota e enviar o print. */
+function ImportError({ error, sefazUrl, onPrint }: { error: string; sefazUrl: string | null; onPrint: () => void }) {
+  if (!sefazUrl) return <Alert>{error}</Alert>
+  return (
+    <div className="space-y-2.5">
+      <Alert>{error}</Alert>
+      <p className="px-1 text-[13px] text-fg-muted">
+        Abra a nota no site da SEFAZ, tire um print da lista de itens e envie aqui: a IA lê o print. Se a lista não couber
+        numa tela, diminua o zoom da página ou adicione os itens que faltarem na revisão.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <a href={sefazUrl} target="_blank" rel="noopener noreferrer">
+          <Button variant="secondary" className="w-full" icon={<ExternalLink className="size-4" />}>
+            Abrir na SEFAZ
+          </Button>
+        </a>
+        <Button className="w-full" icon={<ImageUp className="size-4" />} onClick={onPrint}>
+          Enviar print
+        </Button>
+      </div>
+    </div>
   )
 }
 
