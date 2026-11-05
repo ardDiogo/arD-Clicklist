@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tokens de design. Paleta neutra "stone" + verde de destaque.
+ * As cores semânticas mudam no tema escuro via variáveis CSS.
+ */
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-accent-50: #ecfdf3;
+  --color-accent-100: #d1fadf;
+  --color-accent-500: #16a34a;
+  --color-accent-600: #15803d;
+  --color-accent-700: #166534;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --radius-xl: 0.875rem;
+  --shadow-card: 0 1px 2px rgb(28 25 23 / 0.04), 0 1px 1px rgb(28 25 23 / 0.02);
+}
+
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-muted: #f5f5f4;
+  --border: #e7e5e4;
+  --fg: #1c1917;
+  --fg-muted: #57534e;
+  --fg-subtle: #a8a29e;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0c0a09;
+  --surface: #171412;
+  --surface-muted: #1f1c1a;
+  --border: #2b2725;
+  --fg: #f5f5f4;
+  --fg-muted: #a8a29e;
+  --fg-subtle: #78716c;
+  --danger: #f97066;
+  --danger-soft: #2a1513;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent-500;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
