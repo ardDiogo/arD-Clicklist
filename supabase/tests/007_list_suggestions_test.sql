@@ -48,7 +48,7 @@ from public.purchase_items;
 -- Estoque atual: 1 ketchup em casa
 select public.record_stock_movement(:'ketchup', 'inventory_adjustment', 1) \gset
 
-select list_id, added, months_with_data from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15') \gset
+select list_id, added, months_with_data from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15', true) \gset
 select tests.eq(:'months_with_data'::int, 3, 'três meses de histórico (ago, set, out)');
 select tests.eq((select quantity from public.shopping_list_items where household_product_id = :'ketchup'), 1.000::numeric,
                 'ketchup: média 2/mês (3+1+2)/3, menos 1 em casa = 1 (compra de novembro ignorada)');
@@ -67,29 +67,42 @@ select tests.eq((select count(*) from public.shopping_list_items where household
 select tests.eq(:'added'::int, 3, 'três sugestões adicionadas');
 
 -- Não duplica e respeita itens presentes/removidos
-select added as again from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15') \gset
+select added as again from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15', true) \gset
 select tests.eq(:'again'::int, 0, 'sugerir de novo não duplica');
 select public.update_list_item((select id from public.shopping_list_items where household_product_id = :'ketchup'), 5);
 select public.remove_list_item((select id from public.shopping_list_items where household_product_id = :'arroz'));
-select public.suggest_shopping_from_history(:'hh', 3, '2026-11-15') \gset
+select public.suggest_shopping_from_history(:'hh', 3, '2026-11-15', true) \gset
 select tests.eq((select quantity from public.shopping_list_items where household_product_id = :'ketchup'), 5.000::numeric,
                 'quantidade ajustada pelo usuário é mantida');
 select tests.eq((select count(*) from public.shopping_list_items_view where household_product_id = :'arroz')::int, 0,
                 'item removido pelo usuário não volta');
 
 -- Estoque suficiente: nada sugerido
-select tests.eq((select added from public.suggest_shopping_from_history(:'hh', 1, '2026-10-01')), 0,
+select tests.eq((select added from public.suggest_shopping_from_history(:'hh', 1, '2026-10-01', true)), 0,
                 'em outubro (base: setembro) o que falta já está na lista ou removido');
 
 -- Motivos quando nada é adicionado
 select added as a, already_in_list as l, covered_by_stock as c, removed_by_user as r
-  from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15') \gset
+  from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15', true) \gset
 select tests.eq(:'a'::int || '|' || :'l'::int || '|' || :'c'::int || '|' || :'r'::int, '0|2|0|1',
                 'motivos: ketchup e sabonete já na lista, arroz removido pelo usuário');
 -- Estoque cobrindo o consumo
 select public.record_stock_movement(:'arroz', 'inventory_adjustment', 3) \gset
-select tests.eq((select covered_by_stock from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15')), 0,
+select tests.eq((select covered_by_stock from public.suggest_shopping_from_history(:'hh', 3, '2026-11-15', true)), 0,
                 'arroz removido não conta como coberto (motivo é a remoção)');
+
+-- Padrão: média mensal comprada, sem descontar o estoque (família B, estoque alto)
+select tests.login('00000000-0000-0000-0000-00000000000a');
+select public.create_household('Casa B') as hb \gset
+select public.create_tracked_product(:'hb', 'Leite', null, null, null, null, 'un', null, null, 0, 0) as leite \gset
+select public.create_purchase_draft(:'hb', 'manual', '{"purchased_at":"2026-08-10T12:00:00-03:00","items":[{"description":"LEITE","quantity":"12","total":"60"}]}'::jsonb) as b1 \gset
+select public.create_purchase_draft(:'hb', 'manual', '{"purchased_at":"2026-09-10T12:00:00-03:00","items":[{"description":"LEITE","quantity":"6","total":"30"}]}'::jsonb) as b2 \gset
+select public.create_purchase_draft(:'hb', 'manual', '{"purchased_at":"2026-10-10T12:00:00-03:00","items":[{"description":"LEITE","quantity":"12","total":"60"}]}'::jsonb) as b3 \gset
+select public.record_stock_movement(:'leite', 'inventory_adjustment', 20) \gset
+select added as bdef from public.suggest_shopping_from_history(:'hb', 3, '2026-11-15') \gset
+select tests.eq(:'bdef'::int, 1, 'padrão: entra mesmo com estoque alto');
+select tests.eq((select quantity from public.shopping_list_items where household_product_id = :'leite'), 10.000::numeric,
+                'padrão: média mensal comprada (12+6+12)/3 = 10, sem descontar os 20 em casa');
 
 -- Validações e permissões
 select tests.expect_error(format($$ select * from public.suggest_shopping_from_history(%L, 0) $$, :'hh'), 'Período inválido');

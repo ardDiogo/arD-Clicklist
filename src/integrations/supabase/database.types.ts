@@ -576,7 +576,7 @@ export type Database = {
         Returns: { list_id: string; added: number; updated: number; removed: number }[]
       }
       suggest_shopping_from_history: {
-        Args: { p_household_id: string; p_months?: number; p_reference?: string | null }
+        Args: { p_household_id: string; p_months?: number; p_reference?: string | null; p_subtract_stock?: boolean }
         Returns: {
           list_id: string
           added: number

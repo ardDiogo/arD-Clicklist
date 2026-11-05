@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/feedback'
 import { useToast } from '@/components/ui/Toast'
 import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
-import { ListSkeleton } from '@/features/inventory/components'
+import { ListSkeleton, Segmented } from '@/features/inventory/components'
 import { useStock } from '@/features/inventory/hooks'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency } from '@/lib/format'
@@ -57,13 +57,16 @@ export function ShoppingListPage() {
     }
   }
 
-  async function suggest() {
+  const [suggestOpen, setSuggestOpen] = useState(false)
+
+  async function suggest(months: number, subtractStock: boolean) {
+    setSuggestOpen(false)
     setSuggesting(true)
     try {
-      const r = await suggestFromHistory(household.id, 3)
+      const r = await suggestFromHistory(household.id, months, subtractStock)
       await reload()
       if (!r || r.months_with_data === 0) {
-        toast.show('Ainda não há compras dos últimos 3 meses para calcular o consumo')
+        toast.show(`Ainda não há compras dos últimos ${months} meses (sem contar o mês atual) para calcular a média`)
       } else if (r.added === 0) {
         const reasons = [
           r.already_in_list ? `${r.already_in_list} já ${r.already_in_list === 1 ? 'está' : 'estão'} na lista` : null,
@@ -72,7 +75,9 @@ export function ShoppingListPage() {
         ].filter(Boolean)
         toast.show(reasons.length ? `Nada novo para sugerir: ${reasons.join(' · ')}` : 'Nada novo: a lista já cobre o consumo médio dos últimos meses')
       } else {
-        toast.show(`+${r.added} ${r.added === 1 ? 'item sugerido' : 'itens sugeridos'} pelo consumo dos últimos ${r.months_with_data} meses`)
+        toast.show(
+          `+${r.added} ${r.added === 1 ? 'item' : 'itens'} pela média de compra de ${r.months_with_data} ${r.months_with_data === 1 ? 'mês' : 'meses'}${subtractStock ? ' (descontando o estoque)' : ''}`,
+        )
       }
     } catch (e) {
       toast.error(toMessage(e))
@@ -152,7 +157,7 @@ export function ShoppingListPage() {
           {canEdit && (
             <BuildListCard
               suggesting={suggesting}
-              onSuggest={() => void suggest()}
+              onSuggest={() => setSuggestOpen(true)}
               onPhotos={() => navigate('/inventario?voltar=lista')}
               onReset={items.length > 0 ? () => setResetting(true) : undefined}
             />
@@ -264,6 +269,8 @@ export function ShoppingListPage() {
           }}
         />
       )}
+
+      <SuggestDialog open={suggestOpen} onClose={() => setSuggestOpen(false)} onConfirm={(m, sub) => void suggest(m, sub)} />
 
       {list && (
         <FinishDialog
@@ -423,9 +430,9 @@ function BuildListCard({
             {suggesting ? <RefreshCw className="size-[18px] animate-spin" /> : <CalendarClock className="size-[18px]" />}
           </span>
           <span className="min-w-0">
-            <span className="block text-[14px] font-medium">Pelo consumo dos últimos meses</span>
+            <span className="block text-[14px] font-medium">Pela média das compras</span>
             <span className="block text-[12px] leading-4 text-fg-muted">
-              Média das compras dos 3 meses anteriores, descontando o que há em casa.
+              O que vocês compram por mês, em média, nos últimos meses.
             </span>
           </span>
         </button>
@@ -442,6 +449,59 @@ function BuildListCard({
         </button>
       </div>
     </section>
+  )
+}
+
+/** Escolha do cálculo pela média de compras. */
+function SuggestDialog({ open, onClose, onConfirm }: { open: boolean; onClose: () => void; onConfirm: (months: number, subtractStock: boolean) => void }) {
+  const [months, setMonths] = useState(3)
+  const [subtract, setSubtract] = useState(false)
+  const radio = (on: boolean) =>
+    `flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${on ? 'border-accent-500 bg-accent-50/60 dark:bg-accent-700/10' : 'border-border'}`
+  return (
+    <Dialog open={open} onClose={onClose} title="Montar pela média das compras">
+      <div className="space-y-4 text-[14px] leading-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-fg-muted">Período</span>
+          <Segmented
+            label="Período"
+            value={String(months) as '2' | '3' | '6'}
+            onChange={(v) => setMonths(Number(v))}
+            options={[
+              { value: '2', label: '2 meses' },
+              { value: '3', label: '3 meses' },
+              { value: '6', label: '6 meses' },
+            ]}
+          />
+        </div>
+        <label className={radio(!subtract)}>
+          <input type="radio" name="sub" checked={!subtract} onChange={() => setSubtract(false)} className="mt-0.5 size-4 accent-[var(--color-accent-600)]" />
+          <span>
+            <span className="font-medium">Média do que compramos</span>
+            <span className="block text-[13px] text-fg-muted">
+              Cada produto comprado com frequência entra com a quantidade que vocês compram por mês, em média.
+            </span>
+          </span>
+        </label>
+        <label className={radio(subtract)}>
+          <input type="radio" name="sub" checked={subtract} onChange={() => setSubtract(true)} className="mt-0.5 size-4 accent-[var(--color-accent-600)]" />
+          <span>
+            <span className="font-medium">Média menos o que já tem em casa</span>
+            <span className="block text-[13px] text-fg-muted">Só entra a diferença entre a média e o estoque registrado.</span>
+          </span>
+        </label>
+        <p className="text-[12px] text-fg-subtle">
+          Conta os meses anteriores ao atual. Produtos comprados menos de uma vez por mês, em média, e os marcados “Não envia à lista” ficam
+          de fora. Itens que você ajustou ou removeu da lista não são alterados.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={() => onConfirm(months, subtract)}>Montar lista</Button>
+        </div>
+      </div>
+    </Dialog>
   )
 }
 

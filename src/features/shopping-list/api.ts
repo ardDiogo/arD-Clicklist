@@ -40,9 +40,14 @@ export async function generateList(householdId: string) {
   return rows[0] ?? null
 }
 
-/** Sugestão pelo consumo médio dos últimos meses (compras repõem o consumo). */
-export async function suggestFromHistory(householdId: string, months = 3) {
-  const rows = unwrap(await supabase().rpc('suggest_shopping_from_history', { p_household_id: householdId, p_months: months }))
+/**
+ * Lista pela média mensal do que a família compra (últimos meses, sem o mês atual).
+ * `subtractStock`: desconta o que já há em casa (padrão: não desconta).
+ */
+export async function suggestFromHistory(householdId: string, months = 3, subtractStock = false) {
+  const rows = unwrap(
+    await supabase().rpc('suggest_shopping_from_history', { p_household_id: householdId, p_months: months, p_subtract_stock: subtractStock }),
+  )
   return rows[0] ?? null
 }
 
