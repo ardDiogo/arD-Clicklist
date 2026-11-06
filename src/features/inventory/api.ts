@@ -206,12 +206,19 @@ export interface MergeSuggestion {
   into_id: string
   into_name: string
   into_qty: number
+  /** alta = nome genérico contido no outro; media = mesma 1ª palavra (confirmar). */
+  confidence: 'alta' | 'media'
 }
 
 /** Pares de produtos parecidos (o específico/duplicado → o genérico que fica). */
 export async function suggestMerges(householdId: string): Promise<MergeSuggestion[]> {
   const rows = unwrap(await supabase().rpc('suggest_product_merges', { p_household_id: householdId }))
   return rows.map((r) => ({ ...r, from_qty: Number(r.from_qty), into_qty: Number(r.into_qty) }))
+}
+
+/** "Não são o mesmo": a sugestão deste par não aparece mais. */
+export async function dismissMerge(a: string, b: string): Promise<void> {
+  unwrap(await supabase().rpc('dismiss_product_merge', { p_a: a, p_b: b }))
 }
 
 /** Junta "from" em "into": estoque, compras, preços, apelidos e listas passam para "into". */

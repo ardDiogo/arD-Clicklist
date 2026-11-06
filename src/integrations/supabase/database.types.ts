@@ -635,10 +635,11 @@ export type Database = {
         Returns: number
       }
       reopen_purchase: { Args: { p_purchase_id: string }; Returns: number }
+      dismiss_product_merge: { Args: { p_a: string; p_b: string }; Returns: undefined }
       merge_household_products: { Args: { p_from: string; p_into: string }; Returns: undefined }
       suggest_product_merges: {
         Args: { p_household_id: string }
-        Returns: { from_id: string; from_name: string; from_qty: number; into_id: string; into_name: string; into_qty: number }[]
+        Returns: { from_id: string; from_name: string; from_qty: number; into_id: string; into_name: string; into_qty: number; confidence: 'alta' | 'media' }[]
       }
       rebuild_shopping_list: {
         Args: { p_household_id: string; p_mode: 'stock' | 'average'; p_months?: number; p_subtract_stock?: boolean }

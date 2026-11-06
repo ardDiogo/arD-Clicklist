@@ -46,14 +46,26 @@ insert into public.products (household_id, name, unit) values (:'hh', 'Pao Forma
 insert into public.household_products (household_id, product_id, ideal_qty, current_qty) values (:'hh', :'dupprod', 2, 2) returning id as dup \gset
 set role authenticated;
 select tests.eq((select into_id from public.suggest_product_merges(:'hh') where from_id = :'dup'), :'pao'::uuid, 'sugere juntar o duplicado no Pão de forma');
-select tests.eq((select count(*) from public.suggest_product_merges(:'hh') where from_id = :'sanit')::int, 0, 'não sugere juntar Água sanitária com a mineral');
+select tests.eq((select count(*) from public.suggest_product_merges(:'hh') where from_id = :'sanit' and confidence = 'alta')::int, 0, 'não sugere (com certeza) juntar Água sanitária com a mineral');
+select tests.eq((select confidence from public.suggest_product_merges(:'hh') where from_id = :'dup'), 'alta', 'duplicado do pão: confiança alta');
 
 select list_id as lst from public.generate_shopping_list(:'hh') \gset
 select public.merge_household_products(:'dup', :'pao');
 select tests.eq((select current_qty from public.household_products where id = :'pao'), 4.000::numeric, 'estoque somado (2 + 2)');
 select tests.eq((select archived_at is not null from public.household_products where id = :'dup'), true, 'duplicado arquivado');
 select tests.eq((select count(*) from public.shopping_list_items where list_id = :'lst' and household_product_id = :'dup')::int, 0, 'lista sem o duplicado');
-select tests.eq((select count(*) from public.suggest_product_merges(:'hh'))::int, 0, 'sem mais sugestões');
+select tests.eq((select count(*) from public.suggest_product_merges(:'hh') where confidence = 'alta')::int, 0, 'sem mais sugestões de confiança alta');
+
+-- Nível médio: mesma 1ª palavra ("Cogumelo fatiado" × "Cogumelo Odara Int")
+select public.create_tracked_product(:'hh', 'Cogumelo fatiado', 'Saborosas', null, null, 100, 'g', null, null, 1, 1) as cog1 \gset
+select public.create_tracked_product(:'hh', 'Cogumelo Odara Int', null, null, null, 100, 'g', null, null, 1, 1) as cog2 \gset
+reset role;
+update public.household_products set created_at = now() + interval '1 minute' where id = :'cog2';
+set role authenticated;
+select tests.eq((select into_id from public.suggest_product_merges(:'hh') where from_id = :'cog2'), :'cog1'::uuid, 'mesma 1ª palavra: sugere juntar no mais antigo');
+select tests.eq((select confidence from public.suggest_product_merges(:'hh') where from_id = :'cog2'), 'media', 'confiança média');
+select public.dismiss_product_merge(:'cog2', :'cog1');
+select tests.eq((select count(*) from public.suggest_product_merges(:'hh') where from_id = :'cog2')::int, 0, '"não são o mesmo" esconde a sugestão');
 select tests.expect_error(format($$ select public.merge_household_products(%L, %L) $$, :'pao', :'pao'), 'diferente');
 
 select tests.login('00000000-0000-0000-0000-00000000000c');
