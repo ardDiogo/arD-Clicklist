@@ -84,6 +84,8 @@ export interface StoreIndex {
 export interface BasketItem {
   household_product_id: string
   product_name: string
+  /** Descrição da nota da marca/apresentação comparada. */
+  variant_label: string
   unit: string
   min_price: number
   max_price: number
@@ -96,6 +98,7 @@ export interface BasketItem {
 export interface SavingItem {
   household_product_id: string
   product_name: string
+  variant_label: string
   unit: string
   lines: number
   quantity: number
@@ -141,8 +144,14 @@ export interface ProductsData {
   products: ProductStat[]
 }
 
+/** Estatísticas de UMA marca/apresentação (variante) de um produto genérico. */
 export interface PriceStat {
   household_product_id: string
+  variant_key: string
+  variant_label: string
+  price_per_base: number | null
+  base_unit: 'kg' | 'L' | null
+  last_store: string | null
   product_name: string
   brand_name: string | null
   category_name: string
@@ -168,6 +177,10 @@ export interface PriceStat {
 }
 
 export interface PricePoint {
+  variant_key: string
+  variant_label: string
+  price_per_base: number | null
+  base_unit: 'kg' | 'L' | null
   local_date: string
   store_key: string
   store_name: string

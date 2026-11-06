@@ -664,6 +664,10 @@ export type Database = {
           unit_price: number
           discount: number
           total_price: number
+          variant_key: string
+          variant_label: string
+          price_per_base: number | null
+          base_unit: 'kg' | 'L' | null
         }[]
       }
       remove_purchase: { Args: { p_purchase_id: string }; Returns: number }

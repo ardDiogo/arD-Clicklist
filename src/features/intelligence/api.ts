@@ -57,6 +57,7 @@ export async function getPriceHistory(householdId: string, productId: string, ra
     unit_price: Number(r.unit_price),
     discount: Number(r.discount),
     total_price: Number(r.total_price),
+    price_per_base: r.price_per_base === null ? null : Number(r.price_per_base),
   }))
 }
 

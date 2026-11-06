@@ -126,6 +126,23 @@ export function fmtQty(q: number, unit: string): string {
   return `${n} ${unit.toLowerCase()}`
 }
 
+/** "PAO FORMA SEVEN BOYS 450G LEITE" → "Pao Forma Seven Boys 450g Leite" (rótulo da marca/apresentação). */
+export function prettyVariant(label: string | null | undefined, max = 48): string {
+  if (!label) return ''
+  const t = label
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(^|\s)([a-zà-ú])/g, (_, s: string, c: string) => s + c.toUpperCase())
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t
+}
+
+/** Preço por kg/L calculado pelo tamanho escrito na nota ("450G", "CX12"…). */
+export function perBase(p: { price_per_base: number | null; base_unit: 'kg' | 'L' | null }): string | null {
+  if (p.price_per_base === null || p.price_per_base === undefined || !p.base_unit) return null
+  return `${formatCurrency(p.price_per_base)}/${p.base_unit}`
+}
+
 /** Preço por kg/L quando o produto tem tamanho de embalagem e foi comprado por unidade. */
 export function normalizedPrice(p: Pick<PriceStat, 'last_price' | 'unit' | 'package_size' | 'measure_unit'>): string | null {
   if (!p.package_size || p.unit !== 'UN') return null
@@ -291,7 +308,7 @@ export function buildInsights({ range, overview, stores, products, prices, buyer
       out.push({
         id: 'saving-top',
         title: `A maior oportunidade de economia está em ${saving.product_name}`,
-        description: `Comprando no ${saving.best_store_name} (${formatCurrency(saving.best_price)}), teriam pago ${formatCurrency(saving.saving)} a menos. No total, ${formatCurrency(sum)} em ${stores.savings.length} ${stores.savings.length === 1 ? 'produto' : 'produtos'} — valor hipotético, não economia realizada.`,
+        description: `${saving.variant_label ? `${prettyVariant(saving.variant_label)} — c` : 'C'}omprando no ${saving.best_store_name} (${formatCurrency(saving.best_price)}), teriam pago ${formatCurrency(saving.saving)} a menos. No total, ${formatCurrency(sum)} em ${stores.savings.length} ${stores.savings.length === 1 ? 'produto' : 'produtos'} — valor hipotético, não economia realizada.`,
         metric: `Economia potencial ${formatCurrency(saving.saving)}`,
         period,
         source: 'Preços do mesmo produto em outros mercados (até 90 dias de diferença)',
@@ -305,9 +322,9 @@ export function buildInsights({ range, overview, stores, products, prices, buyer
     const up = topBy(prices.filter((p) => (p.last_vs_prev_pct ?? 0) >= 5), (p) => p.last_vs_prev_pct, 1)[0]
     if (up) {
       out.push({
-        id: `price-up-${up.household_product_id}`,
+        id: `price-up-${up.variant_key ?? up.household_product_id}`,
         title: `O preço de ${up.product_name} aumentou ${fmtPct(up.last_vs_prev_pct, false)}`,
-        description: `Último preço ${formatCurrency(up.last_price)}, contra ${formatCurrency(up.prev_price)} na compra anterior.`,
+        description: `${up.variant_label ? `${prettyVariant(up.variant_label)}: ` : ''}último preço ${formatCurrency(up.last_price)}, contra ${formatCurrency(up.prev_price)} na compra anterior da mesma marca.`,
         metric: `Variação ${fmtPct(up.last_vs_prev_pct)}`,
         period,
         source: 'Preço líquido pago (com descontos) nas duas últimas compras',
@@ -318,9 +335,9 @@ export function buildInsights({ range, overview, stores, products, prices, buyer
     const down = topBy(prices.filter((p) => (p.last_vs_prev_pct ?? 0) <= -5), (p) => p.last_vs_prev_pct, 1, 'asc')[0]
     if (down) {
       out.push({
-        id: `price-down-${down.household_product_id}`,
+        id: `price-down-${down.variant_key ?? down.household_product_id}`,
         title: `${down.product_name} ficou ${fmtPct(down.last_vs_prev_pct, false)} mais barato`,
-        description: `Último preço ${formatCurrency(down.last_price)}, contra ${formatCurrency(down.prev_price)} na compra anterior.`,
+        description: `${down.variant_label ? `${prettyVariant(down.variant_label)}: ` : ''}último preço ${formatCurrency(down.last_price)}, contra ${formatCurrency(down.prev_price)} na compra anterior da mesma marca.`,
         metric: `Variação ${fmtPct(down.last_vs_prev_pct)}`,
         period,
         source: 'Preço líquido pago (com descontos) nas duas últimas compras',

@@ -61,6 +61,11 @@ const product = (over: Partial<ProductStat>): ProductStat => ({
 
 const price = (over: Partial<PriceStat>): PriceStat => ({
   household_product_id: 'p',
+  variant_key: 'v',
+  variant_label: '',
+  price_per_base: null,
+  base_unit: null,
+  last_store: null,
   product_name: 'Café',
   brand_name: null,
   category_name: 'Bebidas',
@@ -106,6 +111,15 @@ describe('períodos', () => {
     expect(bucketLabel('2026-10-01', 'month')).toBe('out/26')
     expect(bucketLabel('2026-10-05', 'week')).toBe('05/10')
     expect(bucketLabel('2026-10-05', 'day')).toBe('05')
+  })
+})
+
+describe('marcas', () => {
+  it('rótulo legível da variante e preço por kg/L', async () => {
+    const { prettyVariant, perBase } = await import('./domain')
+    expect(prettyVariant('PAO FORMA SEVEN BOYS 450G LEITE')).toBe('Pao Forma Seven Boys 450g Leite')
+    expect(perBase({ price_per_base: 17.98, base_unit: 'kg' })).toBe('R$\u00a017,98/kg')
+    expect(perBase({ price_per_base: null, base_unit: null })).toBeNull()
   })
 })
 
@@ -199,9 +213,9 @@ describe('insights do arD', () => {
     const ins = buildInsights({
       range,
       prices: [
-        price({ household_product_id: 'c', product_name: 'café', last_price: 11.2, prev_price: 10, last_vs_prev_pct: 12 }),
-        price({ household_product_id: 'a', product_name: 'Arroz', last_price: 9, prev_price: 10, last_vs_prev_pct: -10 }),
-        price({ household_product_id: 'x', product_name: 'Sal', last_vs_prev_pct: 2 }),
+        price({ household_product_id: 'c', variant_key: 'c', product_name: 'café', last_price: 11.2, prev_price: 10, last_vs_prev_pct: 12 }),
+        price({ household_product_id: 'a', variant_key: 'a', product_name: 'Arroz', last_price: 9, prev_price: 10, last_vs_prev_pct: -10 }),
+        price({ household_product_id: 'x', variant_key: 'x', product_name: 'Sal', last_vs_prev_pct: 2 }),
       ],
     })
     expect(ins.map((i) => i.title)).toEqual(['O preço de café aumentou 12%', 'Arroz ficou 10% mais barato'])

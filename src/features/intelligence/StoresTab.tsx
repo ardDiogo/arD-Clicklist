@@ -2,7 +2,7 @@ import { Store } from 'lucide-react'
 import { Badge } from '@/components/ui/feedback'
 import { formatCurrency } from '@/lib/format'
 import { ShareBars } from './charts'
-import { fmtDay, fmtPct, rangeLabel, topBy } from './domain'
+import { fmtDay, fmtPct, prettyVariant, rangeLabel, topBy } from './domain'
 import type { StoresData } from './types'
 import { NotEnough, Section, Stat } from './ui'
 
@@ -83,7 +83,7 @@ export function StoresTab({ data }: { data: StoresData }) {
       <Section
         title="Comparador de preços"
         description={`Mesmo produto em mercados diferentes · preços de ${windowText}`}
-        info="Só entram produtos associados ao estoque (mesma marca e apresentação) e com a mesma unidade na nota. Usa o último preço líquido pago em cada mercado, já com desconto. A janela tem no mínimo os últimos 90 dias."
+        info="Compara a MESMA marca/apresentação (mesmo código de barras ou mesma descrição na nota) em mercados diferentes. Usa o último preço líquido pago em cada mercado, já com desconto. A janela tem no mínimo os últimos 90 dias."
         flush
       >
         {data.stores_with_prices < 2 ? (
@@ -99,9 +99,12 @@ export function StoresTab({ data }: { data: StoresData }) {
         ) : (
           <ul className="divide-y divide-border border-t border-border">
             {data.basket.slice(0, 25).map((b) => (
-              <li key={`${b.household_product_id}-${b.unit}`} className="px-5 py-3">
+              <li key={`${b.variant_label}-${b.unit}`} className="px-5 py-3">
                 <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-[14px] font-medium">{b.product_name}</p>
+                  <p className="min-w-0 truncate text-[14px] font-medium">
+                    {b.product_name}
+                    <span className="block truncate text-[12px] font-normal text-fg-muted">{prettyVariant(b.variant_label)}</span>
+                  </p>
                   <span className="shrink-0 text-[12px] text-fg-muted tabular-nums">diferença {fmtPct(b.spread_pct, false)}</span>
                 </div>
                 <ul className="space-y-1">
@@ -168,14 +171,14 @@ export function StoresTab({ data }: { data: StoresData }) {
           ) : (
             <ul className="space-y-2.5">
               {data.savings.slice(0, 8).map((s) => (
-                <li key={`${s.household_product_id}-${s.unit}`} className="flex items-center gap-3">
+                <li key={`${s.variant_label}-${s.unit}`} className="flex items-center gap-3">
                   <div className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface-muted text-fg-muted">
                     <Store className="size-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-medium">{s.product_name}</p>
                     <p className="truncate text-[12px] text-fg-muted">
-                      {s.best_store_name}: {formatCurrency(s.best_price)}/{s.unit.toLowerCase()}
+                      {prettyVariant(s.variant_label, 36)} · {s.best_store_name}: {formatCurrency(s.best_price)}
                     </p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold text-accent-600 tabular-nums">{formatCurrency(s.saving)}</span>
