@@ -1,4 +1,4 @@
-import { BarChart3, Camera, ChevronRight, ExternalLink, Images, FileCode2, ImageUp, QrCode, ReceiptText, ScanText } from 'lucide-react'
+import { BarChart3, Camera, ChevronRight, Images, ReceiptText, ScanText } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -14,9 +14,8 @@ import { ListSkeleton } from '@/features/inventory/components'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { importFromQr, importPhoto, importXml, listPurchases, SefazReadError, type PurchaseSummary } from './api'
+import { importPhoto, listPurchases, type PurchaseSummary } from './api'
 import { SOURCE_LABEL } from './domain'
-import { QrScanner } from './QrScanner'
 
 export function PurchasesPage() {
   const { household, role } = useCurrentHousehold()
@@ -24,12 +23,9 @@ export function PurchasesPage() {
   const navigate = useNavigate()
   const [purchases, setPurchases] = useState<PurchaseSummary[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [qrOpen, setQrOpen] = useState(false)
   const [processing, setProcessing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [sefazUrl, setSefazUrl] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
-  const printRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
   const [photoMenu, setPhotoMenu] = useState(false)
   const [buyers, setBuyers] = useState<Map<string, string>>(new Map())
@@ -40,7 +36,6 @@ export function PurchasesPage() {
       () => setBuyers(new Map()),
     )
   }, [household.id])
-  const xmlRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -64,25 +59,16 @@ export function PurchasesPage() {
 
   async function run(label: string, fn: () => Promise<string>) {
     setError(null)
-    setSefazUrl(null)
     setProcessing(label)
     try {
       const id = await fn()
-      setQrOpen(false)
       navigate(`/compras/${id}`)
     } catch (e) {
       setError(e instanceof Error && !('code' in e) ? e.message : toMessage(e))
-      if (e instanceof SefazReadError) setSefazUrl(e.sefazUrl)
     } finally {
       setProcessing(null)
     }
   }
-
-  const onQr = useCallback(
-    (text: string) => void run('Consultando a SEFAZ…', () => importFromQr(household.id, text)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [household.id],
-  )
 
   const drafts = purchases?.filter((p) => p.status === 'draft') ?? []
   const confirmed = purchases?.filter((p) => p.status === 'confirmed') ?? []
@@ -103,11 +89,24 @@ export function PurchasesPage() {
 
       {canEdit && (
         <section className="mb-6 space-y-3">
-          <div className="grid grid-cols-3 gap-2.5">
-            <ImportButton icon={QrCode} label="QR Code" hint="NFC-e" onClick={() => { setError(null); setQrOpen(true) }} disabled={!!processing} />
-            <ImportButton icon={ScanText} label="Foto" hint="Leitura com IA" onClick={() => setPhotoMenu(true)} disabled={!!processing} />
-            <ImportButton icon={FileCode2} label="XML" hint="NF-e / NFC-e" onClick={() => xmlRef.current?.click()} disabled={!!processing} />
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              setPhotoMenu(true)
+            }}
+            disabled={!!processing}
+            className="flex w-full items-center gap-4 rounded-xl border border-border bg-surface px-5 py-4 text-left shadow-card transition-[transform,background-color] hover:bg-surface-muted/60 active:scale-[0.99] disabled:opacity-50"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent-50 text-accent-700 dark:bg-accent-700/20 dark:text-accent-100">
+              <ScanText className="size-6" strokeWidth={1.6} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-medium">Registrar compra pela foto do cupom</span>
+              <span className="block text-[13px] text-fg-muted">Tire uma foto ou escolha da galeria — a IA lê os itens e você revisa.</span>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-fg-subtle" />
+          </button>
           <input
             ref={photoRef}
             type="file"
@@ -118,29 +117,6 @@ export function PurchasesPage() {
               const f = e.target.files?.[0]
               e.target.value = ''
               if (f) void run('Lendo o cupom com IA…', () => importPhoto(household.id, f))
-            }}
-          />
-          <input
-            ref={xmlRef}
-            type="file"
-            accept=".xml,application/xml,text/xml"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void run('Lendo o XML…', () => importXml(household.id, f))
-            }}
-          />
-          {/* Print da página da SEFAZ (galeria, sem abrir a câmera). */}
-          <input
-            ref={printRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void run('Lendo o print da nota com IA…', () => importPhoto(household.id, f))
             }}
           />
           {/* Foto do cupom já salva na galeria (sem abrir a câmera). */}
@@ -181,12 +157,12 @@ export function PurchasesPage() {
               </p>
             </div>
           </Dialog>
-          {processing && !qrOpen && (
+          {processing && (
             <Card className="flex items-center gap-3 px-4 py-3 text-[14px] text-fg-muted animate-fade-in">
               <Spinner className="size-4" /> {processing}
             </Card>
           )}
-          {error && !qrOpen && <ImportError error={error} sefazUrl={sefazUrl} onPrint={() => printRef.current?.click()} />}
+          {error && <Alert>{error}</Alert>}
         </section>
       )}
 
@@ -199,7 +175,7 @@ export function PurchasesPage() {
           <EmptyState
             icon={ReceiptText}
             title="Nenhuma compra registrada"
-            description="Leia o QR Code do cupom fiscal, fotografe o cupom ou envie o XML. Você revisa tudo antes de atualizar o estoque."
+            description="Fotografe o cupom fiscal: a IA lê os itens e você revisa tudo antes de atualizar o estoque."
           />
         </Card>
       ) : (
@@ -209,83 +185,11 @@ export function PurchasesPage() {
         </div>
       )}
 
-      <Dialog open={qrOpen} onClose={() => setQrOpen(false)} title="Ler QR Code da NFC-e">
-        {qrOpen && (
-          <div className="space-y-3">
-            {processing ? (
-              <div className="flex flex-col items-center gap-3 py-10 text-[14px] text-fg-muted">
-                <Spinner /> {processing}
-              </div>
-            ) : (
-              <QrScanner onResult={onQr} busy={!!processing} />
-            )}
-            {error && (
-              <ImportError
-                error={error}
-                sefazUrl={sefazUrl}
-                onPrint={() => {
-                  setQrOpen(false)
-                  printRef.current?.click()
-                }}
-              />
-            )}
-          </div>
-        )}
-      </Dialog>
     </>
   )
 }
 
-/** Erro de importação; para QR com falha na SEFAZ, oferece abrir a nota e enviar o print. */
-function ImportError({ error, sefazUrl, onPrint }: { error: string; sefazUrl: string | null; onPrint: () => void }) {
-  if (!sefazUrl) return <Alert>{error}</Alert>
-  return (
-    <div className="space-y-2.5">
-      <Alert>{error}</Alert>
-      <p className="px-1 text-[13px] text-fg-muted">
-        Abra a nota no site da SEFAZ, tire um print da lista de itens e envie aqui: a IA lê o print. Se a lista não couber
-        numa tela, diminua o zoom da página ou adicione os itens que faltarem na revisão.
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        <a href={sefazUrl} target="_blank" rel="noopener noreferrer">
-          <Button variant="secondary" className="w-full" icon={<ExternalLink className="size-4" />}>
-            Abrir na SEFAZ
-          </Button>
-        </a>
-        <Button className="w-full" icon={<ImageUp className="size-4" />} onClick={onPrint}>
-          Enviar print
-        </Button>
-      </div>
-    </div>
-  )
-}
 
-function ImportButton({
-  icon: Icon,
-  label,
-  hint,
-  onClick,
-  disabled,
-}: {
-  icon: typeof QrCode
-  label: string
-  hint: string
-  onClick: () => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-surface px-2 py-4 shadow-card transition-[transform,background-color] hover:bg-surface-muted/60 active:scale-[0.98] disabled:opacity-50"
-    >
-      <Icon className="size-6 text-fg" strokeWidth={1.6} />
-      <span className="text-[14px] font-medium">{label}</span>
-      <span className="text-[11px] text-fg-muted">{hint}</span>
-    </button>
-  )
-}
 
 function PurchaseList({
   title,

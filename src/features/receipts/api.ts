@@ -200,6 +200,7 @@ export async function listPurchases(householdId: string, limit = 50): Promise<Pu
       .select('*')
       .eq('household_id', householdId)
       .neq('status', 'discarded')
+      .order('purchased_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(limit),
   )

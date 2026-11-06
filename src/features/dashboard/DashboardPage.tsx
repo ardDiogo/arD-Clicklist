@@ -135,7 +135,7 @@ export function DashboardPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-medium">Registrar compra</p>
-              <p className="text-[12px] text-fg-muted">QR Code, foto ou XML do cupom fiscal.</p>
+              <p className="text-[12px] text-fg-muted">Foto do cupom fiscal, lida com IA.</p>
             </div>
             <ChevronRight className="size-4 text-fg-subtle" />
           </Card>
