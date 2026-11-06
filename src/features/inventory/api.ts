@@ -135,6 +135,70 @@ export async function setIdealQty(id: string, idealQty: number): Promise<void> {
   unwrap(await supabase().from('household_products').update({ ideal_qty: idealQty }).eq('id', id))
 }
 
+/** Uma marca/descrição de nota ligada ao produto (agrupada por código de barras ou descrição). */
+export interface LinkedItem {
+  key: string
+  description: string
+  ean: string | null
+  purchases: number
+  quantity: number
+  lastPrice: number | null
+  lastDate: string | null
+  lastStore: string | null
+}
+
+/** Itens das notas confirmadas ligados a este produto, agrupados por marca/descrição. */
+export async function listLinkedItems(householdProductId: string): Promise<LinkedItem[]> {
+  const client = supabase()
+  const items = unwrap(
+    await client
+      .from('purchase_items')
+      .select('purchase_id, description, ean, quantity, total_price, ignored')
+      .eq('household_product_id', householdProductId),
+  ).filter((i) => !i.ignored)
+  if (items.length === 0) return []
+  const ids = [...new Set(items.map((i) => i.purchase_id))]
+  const purchases = unwrap(
+    await client.from('purchases').select('id, status, purchased_at, created_at, store_name').in('id', ids).eq('status', 'confirmed'),
+  )
+  const byId = new Map(purchases.map((p) => [p.id, p]))
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+  const groups = new Map<string, LinkedItem & { lastAt: string }>()
+  for (const i of items) {
+    const p = byId.get(i.purchase_id)
+    if (!p) continue
+    const key = i.ean ? `e:${i.ean}` : `d:${norm(i.description)}`
+    const at = p.purchased_at ?? p.created_at
+    const qty = Number(i.quantity)
+    const price = qty > 0 ? Number(i.total_price) / qty : null
+    const g = groups.get(key)
+    if (!g) {
+      groups.set(key, {
+        key,
+        description: i.description,
+        ean: i.ean,
+        purchases: 1,
+        quantity: qty,
+        lastPrice: price,
+        lastDate: at,
+        lastStore: p.store_name,
+        lastAt: at,
+      })
+    } else {
+      g.purchases += 1
+      g.quantity += qty
+      if (at > g.lastAt) Object.assign(g, { lastAt: at, lastDate: at, lastPrice: price, lastStore: p.store_name, description: i.description })
+    }
+  }
+  return [...groups.values()].sort((a, b) => b.purchases - a.purchases || (b.lastAt > a.lastAt ? 1 : -1))
+}
+
 export interface MergeSuggestion {
   from_id: string
   from_name: string

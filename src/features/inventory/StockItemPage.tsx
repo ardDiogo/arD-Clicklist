@@ -12,8 +12,8 @@ import { useCurrentHousehold } from '@/features/household/HouseholdProvider'
 import { can } from '@/features/household/roles'
 import { supabase } from '@/integrations/supabase/client'
 import { toMessage } from '@/lib/errors'
-import { formatDateTime } from '@/lib/format'
-import { archiveItem, getStockItem, mergeProducts, setListExclusion, listMovements, recordMovement, transferItem, type Movement } from './api'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
+import { archiveItem, getStockItem, listLinkedItems, mergeProducts, type LinkedItem, setListExclusion, listMovements, recordMovement, transferItem, type Movement } from './api'
 import { StatusPill, Stepper } from './components'
 import { formatQty, MOVEMENT_LABEL, newIdempotencyKey, parseQty, productSubtitle, type StockItem } from './domain'
 import { PriceCard } from '@/features/receipts/PriceCard'
@@ -137,6 +137,7 @@ export function StockItemPage() {
       )}
 
       <PriceCard householdProductId={item.id} />
+      <LinkedItemsCard householdProductId={item.id} />
 
       <Card>
         <CardHeader title="Histórico" description="Toda alteração de quantidade fica registrada." />
@@ -352,6 +353,54 @@ function ListExclusionCard({ item, onDone }: { item: StockItem; onDone: () => Pr
       >
         <span className={clsx('absolute top-0.5 left-0.5 size-6 rounded-full bg-white shadow transition-transform', on && 'translate-x-5')} />
       </button>
+    </Card>
+  )
+}
+
+/** Marcas/descrições das notas que estão ligadas a este produto genérico. */
+function LinkedItemsCard({ householdProductId }: { householdProductId: string }) {
+  const [rows, setRows] = useState<LinkedItem[] | null>(null)
+  useEffect(() => {
+    let active = true
+    listLinkedItems(householdProductId).then(
+      (r) => active && setRows(r),
+      () => active && setRows([]),
+    )
+    return () => {
+      active = false
+    }
+  }, [householdProductId])
+
+  return (
+    <Card>
+      <CardHeader
+        title="Vinculados a este produto"
+        description="Marcas e descrições das notas que entram aqui. A lista e o estoque contam todas juntas; o preço de cada uma fica separado."
+      />
+      {rows === null ? (
+        <div className="mx-5 mb-5 h-16 animate-pulse rounded-lg bg-surface-muted" />
+      ) : rows.length === 0 ? (
+        <p className="px-5 pb-5 text-[14px] text-fg-muted">Nenhuma compra confirmada ligada a este produto ainda.</p>
+      ) : (
+        <ul className="divide-y divide-border border-t border-border">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-center gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 text-[14px] font-medium">{r.description}</p>
+                <p className="text-[12px] text-fg-muted">
+                  {r.ean ? `Código ${r.ean} · ` : ''}
+                  {r.purchases} {r.purchases === 1 ? 'compra' : 'compras'} · {formatQty(r.quantity)} no total
+                  {r.lastStore ? ` · ${r.lastStore}` : ''}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[14px] font-semibold tabular-nums">{r.lastPrice !== null ? formatCurrency(r.lastPrice) : '—'}</p>
+                <p className="text-[11px] text-fg-subtle">{r.lastDate ? formatDate(r.lastDate) : ''}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   )
 }
